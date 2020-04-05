@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from Cython.Build import cythonize
 from setuptools import setup
