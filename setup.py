@@ -16,6 +16,6 @@ programming assignments',
       url='https://github.com/iradicek/clara',
       packages=['clara'],
       ext_modules = cythonize(extensions),
-      install_requires=['pycparser', 'zss'],
+      install_requires=['pycparser', 'zss', 'javalang'],
       scripts=['bin/clara']
      )
