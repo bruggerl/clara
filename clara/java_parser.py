@@ -38,7 +38,6 @@ class JavaParser(Parser):
             self.visit(e)
 
     def visit_MethodDeclaration(self, node):
-        print(node.__repr__())
         name = node.name
         rtype = 'void' if node.return_type is None else '%s' % node.return_type
 
@@ -72,11 +71,13 @@ class JavaParser(Parser):
         return node.name, node.modifiers, node.type.name
 
     def visit_LocalVariableDeclaration(self, node):
-        print(node.__repr__())
-        type, dim = self.visit(node.type)
+        type = self.visit(node.type)
 
         for decl in node.declarators:
             name, init = self.visit(decl)
+
+            if isinstance(init, Op) and (init.name == 'ArrayCreate' or init.name == 'ArrayInit'):
+                type += '[]'
 
             try:
                 self.addtype(name, type)
@@ -85,21 +86,36 @@ class JavaParser(Parser):
                     name, node.coord.line,))
                 return
 
-            if init:
-                self.addexpr(name, init)
+            self.addexpr(name, init)
 
     def visit_VariableDeclarator(self, node):
-        return (node.name, self.visit_expr(node.initializer))
+        init = self.visit_expr(node.initializer)
+
+        return node.name, init
 
     def visit_BasicType(self, node):
-        return node.name, None
+        return node.name
+
+    def visit_ArrayInitializer(self, node):
+        exprs = list(map(self.visit_expr, node.initializers or []))
+        return Op('ArrayInit', *exprs, line=node.position)
+
+    def visit_ArrayCreator(self, node):
+        if len(node.dimensions) > 1:
+            raise NotSupported('Double Array', line=node.position)
+
+        dim = self.visit_expr(node.dimensions[0])
+
+        if node.initializer is not None:
+            raise NotSupported('Array Init and Create together', line=node.position)
+
+        return Op('ArrayCreate', dim, line=node.position)
 
     def visit_StatementExpression(self, node):
         return self.visit(node.expression)
 
     def visit_MethodInvocation(self, node):
         # Parse args
-        print(node.__repr__())
         args = list(map(self.visit_expr, node.arguments))
 
         if node.qualifier == 'System.out' and node.member == 'println':
@@ -132,15 +148,20 @@ class JavaParser(Parser):
         self.addexpr(VAR_OUT, expr)
 
     def visit_Literal(self, node):
-        print(node.__repr__())
-        return Const('{}'.format(node.value), line=node.position)
+        expr = Const('{}'.format(node.value), line=node.position)
+
+        if node.prefix_operators:
+            if node.prefix_operators[0] in ['--', '++']:
+                raise ParseError('Unexpected type - required: variable, found: value')
+            elif node.prefix_operators[0] == '-':
+                return Op('-', expr, line=node.position)
+
+        return expr
 
     def visit_MemberReference(self, node):
-        print(node.__repr__())
         return Var(node.member, line=node.position)
 
     def visit_Assignment(self, node):
-        print(node.__repr__())
         exprl = self.visit_expr(node.expressionl)
         value = self.visit(node.value)
 
