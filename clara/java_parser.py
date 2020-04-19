@@ -83,7 +83,7 @@ class JavaParser(Parser):
                 self.addtype(name, type)
             except AssertionError:
                 self.addwarn("Ignored global definition '%s' on line %s." % (
-                    name, node.coord.line,))
+                    name, node.position,))
                 return
 
             self.addexpr(name, init)
@@ -163,35 +163,66 @@ class JavaParser(Parser):
         return expr
 
     def visit_MemberReference(self, node):
-        print(node.__repr__())
         expr = Var(node.member, line=node.position)
+
+        if node.selectors:
+            if len(node.selectors) > 1:
+                raise NotSupported('Double Array', line=node.position)
+
+            expr = Op('[]', expr, self.visit_expr(node.selectors[0]), line=node.position)
 
         if node.prefix_operators:
             if node.prefix_operators[0] in ['--', '++']:
+                if not isinstance(expr, Var):
+                    raise NotSupported('++/-- supported only for Vars',
+                                       line=node.position)
+
                 self.addexpr(expr.name, Op(node.prefix_operators[0][1], expr.copy(), Const('1'), line=node.position))
+
             elif node.prefix_operators[0] == '-':
                 return Op('-', expr, line=node.position)
 
         if node.postfix_operators:
             if node.postfix_operators[0] in ['--', '++']:
+                if not isinstance(expr, Var):
+                    raise NotSupported('++/-- supported only for Vars',
+                                       line=node.position)
+
                 self.addexpr(expr.name, Op(node.postfix_operators[0][1], expr.copy(), Const('1'), line=node.position))
 
         return expr
 
     def visit_Assignment(self, node):
         exprl = self.visit_expr(node.expressionl)
-        value = self.visit(node.value)
+        rvalue = self.visit(node.value)
 
         if node.type == '=':
             pass
         elif len(node.type) == 2 and node.type[1] == '=':
-            value = Op(node.type[0], exprl.copy(), value, line=value.position)
+            rvalue = Op(node.type[0], exprl.copy(), rvalue, line=node.position)
         else:
             raise NotSupported("Assignment operator: '%s'" % (node.type,), line=node.position)
 
-        self.addexpr(exprl.name, value.copy(),)
+        # Distinguish lvalue (ID and Array)
+        if isinstance(exprl, Var):
+            lval = exprl
+
+        elif (isinstance(exprl, Op) and exprl.name == '[]' and
+              isinstance(exprl.args[0], Var)):
+            rvalue = Op('ArrayAssign', exprl.args[0].copy(),
+                        exprl.args[1].copy(), rvalue, line=node.position)
+            lval = exprl.args[0]
+
+        else:
+            raise NotSupported("Assignment exprl '%s'" % (exprl,),
+                               line=node.position)
+
+        self.addexpr(lval.name, rvalue.copy(), )
 
         return exprl
+
+    def visit_ArraySelector(self, node):
+        return self.visit_expr(node.index)
 
     def visit_BinaryOperation(self, node):
         return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr), line=node.position)
