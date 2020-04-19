@@ -152,14 +152,31 @@ class JavaParser(Parser):
 
         if node.prefix_operators:
             if node.prefix_operators[0] in ['--', '++']:
-                raise ParseError('Unexpected type - required: variable, found: value')
+                raise NotSupported('++/-- only supported for Vars')
             elif node.prefix_operators[0] == '-':
                 return Op('-', expr, line=node.position)
+
+        if node.postfix_operators:
+            if node.prefix_operators[0] in ['--', '++']:
+                raise NotSupported('++/-- only supported for Vars')
 
         return expr
 
     def visit_MemberReference(self, node):
-        return Var(node.member, line=node.position)
+        print(node.__repr__())
+        expr = Var(node.member, line=node.position)
+
+        if node.prefix_operators:
+            if node.prefix_operators[0] in ['--', '++']:
+                self.addexpr(expr.name, Op(node.prefix_operators[0][1], expr.copy(), Const('1'), line=node.position))
+            elif node.prefix_operators[0] == '-':
+                return Op('-', expr, line=node.position)
+
+        if node.postfix_operators:
+            if node.postfix_operators[0] in ['--', '++']:
+                self.addexpr(expr.name, Op(node.postfix_operators[0][1], expr.copy(), Const('1'), line=node.position))
+
+        return expr
 
     def visit_Assignment(self, node):
         exprl = self.visit_expr(node.expressionl)
