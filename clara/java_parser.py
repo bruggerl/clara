@@ -98,18 +98,26 @@ class JavaParser(Parser):
 
     def visit_ArrayInitializer(self, node):
         exprs = list(map(self.visit_expr, node.initializers or []))
-        return Op('ArrayInit', *exprs, line=node.position)
+        return Op('ArrayInit', *exprs, line=node.position.line)
 
     def visit_ArrayCreator(self, node):
         if len(node.dimensions) > 1:
-            raise NotSupported('Double Array', line=node.position)
+            raise NotSupported('Double Array')
 
         dim = self.visit_expr(node.dimensions[0])
 
         if node.initializer is not None:
-            raise NotSupported('Array Init and Create together', line=node.position)
+            raise NotSupported('Array Init and Create together')
 
-        return Op('ArrayCreate', dim, line=node.position)
+        return Op('ArrayCreate', dim)
+
+    def visit_BlockStatement(self, node):
+        if node.statements:
+            for statement in node.statements:
+                res = self.visit(statement)
+
+                if isinstance(res, Op) and res.name == 'MethodInvocation':
+                    self.addexpr('_', res)
 
     def visit_StatementExpression(self, node):
         return self.visit(node.expression)
@@ -122,39 +130,40 @@ class JavaParser(Parser):
             self.visit_println(node, args)
 
         elif node.member in self.fncs.keys():
-            expr = Var(node.member, line=node.position)
-            return Op('FuncCall', expr, *args, line=node.position)
+            expr = Var(node.member, line=node.position.line)
+            return Op('FuncCall', expr, *args, line=node.position.line)
 
         else:
             raise NotSupported(
-                "Unsupported function call: '%s'" % (node.member,), line=node.position)
+                "Unsupported function call: '%s'" % (node.member,), line=node.position.line)
 
     def visit_println(self, node, args):
         if len(args) == 0:
             self.addwarn("'System.out.println' with zero args at line %s" % (
-                node.position,))
-            fmt = Const('?', line=node.position)
+                node.position.line,))
+            fmt = Const('?', line=node.position.line)
         else:
             if isinstance(args[0], Const):
                 fmt = args[0]
                 args = args[1:]
             else:
-                self.addwarn("First argument of 'System.out.println' at lines %s should be a format" % (node.position,))
-                fmt = Const('?', line=node.position)
+                self.addwarn(
+                    "First argument of 'System.out.println' at lines %s should be a format" % (node.position.line,))
+                fmt = Const('?', line=node.position.line)
 
         expr = Op('StrAppend', Var(VAR_OUT),
-                  Op('StrFormat', fmt, *args, line=node.position),
-                  line=node.position)
+                  Op('StrFormat', fmt, *args, line=node.position.line),
+                  line=node.position.line)
         self.addexpr(VAR_OUT, expr)
 
     def visit_Literal(self, node):
-        expr = Const('{}'.format(node.value), line=node.position)
+        expr = Const('{}'.format(node.value), line=node.position.line)
 
         if node.prefix_operators:
             if node.prefix_operators[0] in ['--', '++']:
                 raise NotSupported('++/-- only supported for Vars')
             elif node.prefix_operators[0] == '-':
-                return Op('-', expr, line=node.position)
+                return Op('-', expr, line=node.position.line)
 
         if node.postfix_operators:
             if node.prefix_operators[0] in ['--', '++']:
@@ -163,32 +172,34 @@ class JavaParser(Parser):
         return expr
 
     def visit_MemberReference(self, node):
-        expr = Var(node.member, line=node.position)
+        expr = Var(node.member, line=node.position.line)
 
         if node.selectors:
             if len(node.selectors) > 1:
-                raise NotSupported('Double Array', line=node.position)
+                raise NotSupported('Double Array', line=node.position.line)
 
-            expr = Op('[]', expr, self.visit_expr(node.selectors[0]), line=node.position)
+            expr = Op('[]', expr, self.visit_expr(node.selectors[0]), line=node.position.line)
 
         if node.prefix_operators:
             if node.prefix_operators[0] in ['--', '++']:
                 if not isinstance(expr, Var):
                     raise NotSupported('++/-- supported only for Vars',
-                                       line=node.position)
+                                       line=node.position.line)
 
-                self.addexpr(expr.name, Op(node.prefix_operators[0][1], expr.copy(), Const('1'), line=node.position))
+                self.addexpr(expr.name,
+                             Op(node.prefix_operators[0][1], expr.copy(), Const('1'), line=node.position.line))
 
             elif node.prefix_operators[0] == '-':
-                return Op('-', expr, line=node.position)
+                return Op('-', expr, line=node.position.line)
 
         if node.postfix_operators:
             if node.postfix_operators[0] in ['--', '++']:
                 if not isinstance(expr, Var):
                     raise NotSupported('++/-- supported only for Vars',
-                                       line=node.position)
+                                       line=node.position.line)
 
-                self.addexpr(expr.name, Op(node.postfix_operators[0][1], expr.copy(), Const('1'), line=node.position))
+                self.addexpr(expr.name,
+                             Op(node.postfix_operators[0][1], expr.copy(), Const('1'), line=node.position.line))
 
         return expr
 
@@ -199,9 +210,9 @@ class JavaParser(Parser):
         if node.type == '=':
             pass
         elif len(node.type) == 2 and node.type[1] == '=':
-            rvalue = Op(node.type[0], exprl.copy(), rvalue, line=node.position)
+            rvalue = Op(node.type[0], exprl.copy(), rvalue)
         else:
-            raise NotSupported("Assignment operator: '%s'" % (node.type,), line=node.position)
+            raise NotSupported("Assignment operator: '%s'" % (node.type,))
 
         # Distinguish lvalue (ID and Array)
         if isinstance(exprl, Var):
@@ -210,12 +221,11 @@ class JavaParser(Parser):
         elif (isinstance(exprl, Op) and exprl.name == '[]' and
               isinstance(exprl.args[0], Var)):
             rvalue = Op('ArrayAssign', exprl.args[0].copy(),
-                        exprl.args[1].copy(), rvalue, line=node.position)
+                        exprl.args[1].copy(), rvalue)
             lval = exprl.args[0]
 
         else:
-            raise NotSupported("Assignment exprl '%s'" % (exprl,),
-                               line=node.position)
+            raise NotSupported("Assignment exprl '%s'" % (exprl,))
 
         self.addexpr(lval.name, rvalue.copy(), )
 
@@ -225,7 +235,17 @@ class JavaParser(Parser):
         return self.visit_expr(node.index)
 
     def visit_BinaryOperation(self, node):
-        return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr), line=node.position)
+        return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr))
+
+    def visit_IfStatement(self, node):
+        self.visit_if(node, node.condition, node.then_statement, node.else_statement)
+
+    def getline(self, node):
+        if node.position:
+            return node.position.line
+
+        # position property is not set in all nodes
+        return -1
 
 
 # Register JAVA parser
