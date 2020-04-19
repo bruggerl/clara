@@ -3,7 +3,7 @@ JAVA parser
 '''
 
 # clara lib imports
-from .model import Var, Const, Op, VAR_OUT
+from .model import Var, Const, Op, VAR_OUT, VAR_RET
 from .parser import Parser, ParseError, addlangparser, NotSupported, ParseError
 
 import javalang
@@ -258,6 +258,10 @@ class JavaParser(Parser):
     def visit_IfStatement(self, node):
         self.visit_if(node, node.condition, node.then_statement, node.else_statement)
 
+    def visit_SwitchStatement(self, node):
+        print(node.__repr__())
+        # TODO
+
     def visit_ForStatement(self, node):
         self.visit_loop(node, node.control.init, node.control.condition,
                         node.control.update, node.body, False, 'for')
@@ -267,9 +271,51 @@ class JavaParser(Parser):
                         False, 'while')
 
     def visit_DoStatement(self, node):
-        print(node.__repr__())
         self.visit_loop(node, None, node.condition, None, node.body,
                         True, 'do-while')
+
+    def visit_ContinueStatement(self, node):
+        if self.nobcs:
+            return
+
+        # Find loop
+        lastloop = self.lastloop()
+        if not lastloop:
+            self.addwarn("'continue' outside loop at line %s", node.position.line)
+            return
+
+        # Add new location and jump to condition location
+        self.hasbcs = True
+        preloc = self.loc
+        self.loc = self.addloc(
+            desc="after 'continue' statement at line %s" % (
+                node.position.line,))
+        self.addtrans(preloc, True, lastloop[2] if lastloop[2] else lastloop[0])
+
+    def visit_BreakStatement(self, node):
+        # Find loop
+        lastloop = self.lastloop()
+
+        if not lastloop:
+            self.addwarn("'break' outside loop at line %s", node.position.line)
+            return
+
+        # Add new location and jump to exit location
+        self.hasbcs = True
+        preloc = self.loc
+        self.loc = self.addloc(
+            desc="after 'break' statement at line %s" % (
+                node.position.line,))
+
+        self.addtrans(preloc, True, lastloop[1])
+
+    def visit_ReturnStatement(self, node):
+        expr = self.visit_expr(node.expression)
+
+        if not expr:
+            expr = Const('top', line=node.position.line)
+
+        self.addexpr(VAR_RET, expr)
 
     def visit_list(self, node):
         for child in node:
@@ -286,7 +332,7 @@ class JavaParser(Parser):
             return node.position.line
 
         # position property is not set in all nodes
-        return -1
+        return 1
 
 
 # Register JAVA parser
