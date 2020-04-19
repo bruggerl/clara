@@ -255,6 +255,20 @@ class JavaParser(Parser):
     def visit_BinaryOperation(self, node):
         return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr))
 
+    def visit_TernaryExpression(self, node):
+        print(node.__repr__())
+        cond = self.visit_expr(node.condition)
+
+        n = self.numexprs()
+        ift = self.visit_expr(node.if_true)
+        iff = self.visit_expr(node.if_false)
+
+        if self.numexprs() > n:
+            self.rmlastexprs(num=self.numexprs() - n)
+            return self.visit_if(node, node.condition, node.if_true, node.if_false)
+
+        return Op('ite', cond, ift, iff)
+
     def visit_IfStatement(self, node):
         self.visit_if(node, node.condition, node.then_statement, node.else_statement)
 
