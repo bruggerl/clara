@@ -193,6 +193,9 @@ class JavaParser(Parser):
 
         return exprl
 
+    def visit_BinaryOperation(self, node):
+        return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr), line=node.position)
+
 
 # Register JAVA parser
 addlangparser('java', JavaParser)
