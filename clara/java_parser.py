@@ -70,6 +70,24 @@ class JavaParser(Parser):
     def visit_FormalParameter(self, node):
         return node.name, node.modifiers, node.type.name
 
+    def visit_VariableDeclaration(self, node):
+        type = self.visit(node.type)
+
+        for decl in node.declarators:
+            name, init = self.visit(decl)
+
+            if isinstance(init, Op) and (init.name == 'ArrayCreate' or init.name == 'ArrayInit'):
+                type += '[]'
+
+            try:
+                self.addtype(name, type)
+            except AssertionError:
+                self.addwarn("Ignored global definition '%s' on line %s." % (
+                    name, node.position,))
+                return
+
+            self.addexpr(name, init)
+
     def visit_LocalVariableDeclaration(self, node):
         type = self.visit(node.type)
 
@@ -240,7 +258,30 @@ class JavaParser(Parser):
     def visit_IfStatement(self, node):
         self.visit_if(node, node.condition, node.then_statement, node.else_statement)
 
+    def visit_ForStatement(self, node):
+        self.visit_loop(node, node.control.init, node.control.condition,
+                        node.control.update, node.body, False, 'for')
+
+    def visit_WhileStatement(self, node):
+        self.visit_loop(node, None, node.condition, None, node.body,
+                        False, 'while')
+
+    def visit_DoStatement(self, node):
+        print(node.__repr__())
+        self.visit_loop(node, None, node.condition, None, node.body,
+                        True, 'do-while')
+
+    def visit_list(self, node):
+        for child in node:
+            self.visit(child)
+
     def getline(self, node):
+        if isinstance(node, list):
+            if len(node):
+                return self.getline(node[0])
+            else:
+                return
+
         if node.position:
             return node.position.line
 
