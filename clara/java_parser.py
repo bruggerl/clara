@@ -378,6 +378,11 @@ class JavaParser(Parser):
 
         self.addexpr(VAR_RET, expr)
 
+    def visit_Cast(self, node):
+        to_type = self.visit(node.type)
+        expr = self.visit_expr(node.expression)
+        return Op('cast', Const(to_type), expr)
+
     def visit_list(self, node):
         for child in node:
             self.visit(child)
