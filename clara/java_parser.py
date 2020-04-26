@@ -16,6 +16,8 @@ class JavaParser(Parser):
 
         self.fncs = {}
 
+        self.inswitch = False
+
     def parse(self, code):
         """
         Parses JAVA code
@@ -273,18 +275,60 @@ class JavaParser(Parser):
         self.visit_if(node, node.condition, node.then_statement, node.else_statement)
 
     def visit_SwitchStatement(self, node):
-        print(node.__repr__())
-        # TODO
+        n = len(node.cases)
+
+        def convert(i):
+            if i >= n:
+                return
+
+            item = node.cases[i]
+            # Item statement
+            stmt = item.statements
+
+            if i == (n - 1) and len(item.case) == 0:
+                return stmt
+
+            expr = item.case[0]
+
+            if isinstance(item, javalang.parser.tree.SwitchStatementCase):
+                next = convert(i + 1)
+
+                ifcond = javalang.parser.tree.BinaryOperation(operator='==', operandl=node.expression,
+                                                              operandr=expr)
+                ifstmt = javalang.parser.tree.IfStatement(condition=ifcond, then_statement=stmt,
+                                                          else_statement=next)
+
+                return ifstmt
+
+        stmt = convert(0)
+        if stmt:
+            insw = self.inswitch
+            self.inswitch = True
+
+            res = self.visit(stmt)
+
+            self.inswitch = insw
+
+            return res
 
     def visit_ForStatement(self, node):
+        if self.inswitch:
+            raise NotSupported("Loop inside switch", line=node.position.line)
+
         self.visit_loop(node, node.control.init, node.control.condition,
                         node.control.update, node.body, False, 'for')
 
     def visit_WhileStatement(self, node):
+        if self.inswitch:
+            raise NotSupported("Loop inside switch", line=node.position.line)
+
         self.visit_loop(node, None, node.condition, None, node.body,
                         False, 'while')
 
     def visit_DoStatement(self, node):
+        if self.inswitch:
+            raise NotSupported("Loop inside switch", line=node.position.line)
+
         self.visit_loop(node, None, node.condition, None, node.body,
                         True, 'do-while')
 
@@ -307,6 +351,9 @@ class JavaParser(Parser):
         self.addtrans(preloc, True, lastloop[2] if lastloop[2] else lastloop[0])
 
     def visit_BreakStatement(self, node):
+        if self.inswitch or self.nobcs:
+            return
+
         # Find loop
         lastloop = self.lastloop()
 
