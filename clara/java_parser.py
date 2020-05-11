@@ -118,7 +118,7 @@ class JavaParser(Parser):
 
     def visit_ArrayInitializer(self, node):
         exprs = list(map(self.visit_expr, node.initializers or []))
-        return Op('ArrayInit', *exprs, line=node.position.line)
+        return Op('ArrayInit', *exprs)
 
     def visit_ArrayCreator(self, node):
         if len(node.dimensions) > 1:
@@ -158,22 +158,8 @@ class JavaParser(Parser):
                 "Unsupported function call: '%s'" % (node.member,), line=node.position.line)
 
     def visit_println(self, node, args):
-        if len(args) == 0:
-            self.addwarn("'System.out.println' with zero args at line %s" % (
-                node.position.line,))
-            fmt = Const('?', line=node.position.line)
-        else:
-            if isinstance(args[0], Const):
-                fmt = args[0]
-                args = args[1:]
-            else:
-                self.addwarn(
-                    "First argument of 'System.out.println' at lines %s should be a format" % (node.position.line,))
-                fmt = Const('?', line=node.position.line)
-
-        expr = Op('StrAppend', Var(VAR_OUT),
-                  Op('StrFormat', fmt, *args, line=node.position.line),
-                  line=node.position.line)
+        values_model = list(map(self.visit_expr, node.arguments))
+        expr = Op('StrAppend', Var(VAR_OUT), *values_model, line=node.position.line)
         self.addexpr(VAR_OUT, expr)
 
     def visit_Literal(self, node):

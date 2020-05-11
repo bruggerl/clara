@@ -258,7 +258,6 @@ class Parser(object):
 
         # Name of the node class
         name = node.__class__.__name__
-        print(name)
 
         # Get method
         meth = getattr(self, 'visit_%s' % (name,), None)
