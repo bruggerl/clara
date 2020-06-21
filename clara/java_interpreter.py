@@ -4,6 +4,41 @@ JAVA interpreter
 
 # clara lib imports
 from .interpreter import Interpreter, addlanginter, RuntimeErr, UndefValue
+from .model import Const
+
+import math
+
+
+def libcall(*args):
+    '''
+    Decorator for library calls
+    - args is a list of types of arguments
+    '''
+
+    def dec(fun):  # fun - is an original function to call
+
+        # Wrapper instead of real function (calls real function inside)
+        def wrap(self, f, mem):
+
+            # First check number of arguments
+            if len(args) != len(f.args):
+                raise RuntimeErr("Expected '%d' args in '%s', got '%d'" % (
+                    len(args), f.name, len(f.args)))
+
+            # Evaluate args
+            fargs = [self.execute(x, mem) for x in f.args]
+
+            # Convert args
+            nargs = []
+            for a, t in zip(fargs, args):
+                nargs.append(self.convert(a, t))
+
+            # Call original function
+            return fun(self, *nargs)
+
+        return wrap
+
+    return dec
 
 
 class JavaInterpreter(Interpreter):
@@ -15,7 +50,7 @@ class JavaInterpreter(Interpreter):
     def execute_Const(self, c, mem):
         # Undef
         if c.value == '?':
-            return UndefValue
+            return UndefValue()
 
         # String
         if len(c.value) >= 2 and c.value[0] == c.value[-1] == '"':
@@ -29,6 +64,10 @@ class JavaInterpreter(Interpreter):
                     return ord(ch)
             except ValueError:
                 pass
+
+        # Bool
+        if c.value in ('true', 'false'):
+            return c.value == 'true'
 
         # Integer
         try:
@@ -60,7 +99,19 @@ class JavaInterpreter(Interpreter):
         return self.tonumeric(res)
 
     def execute_BinaryOp(self, op, x, y, mem):
-        x = self.tonumeric(self.execute(x, mem))
+        x_str = False
+        y_str = False
+
+        if isinstance(x, Const) and len(x.value) >= 2 and x.value[0] == x.value[-1] == '"':
+            x_str = True
+            x = self.execute(x, mem)
+
+        if isinstance(y, Const) and len(y.value) >= 2 and y.value[0] == y.value[-1] == '"':
+            y_str = True
+            y = self.execute(y, mem)
+
+        if not x_str:
+            x = self.tonumeric(self.execute(x, mem))
 
         # Special case for short-circut
         if op in ['&&', '||']:
@@ -73,12 +124,19 @@ class JavaInterpreter(Interpreter):
 
             return self.tonumeric(self.execute(y, mem))
 
-        y = self.tonumeric(self.execute(y, mem))
+        if not y_str:
+            y = self.tonumeric(self.execute(y, mem))
 
-        x, y = self.togreater(x, y)
+        if not x_str and not y_str:
+            x, y = self.togreater(x, y)
 
         if op == '+':
-            res = x + y
+            if isinstance(x, str):
+                res = x + '{}'.format(y)
+            elif isinstance(y, str):
+                res = '{}'.format(x) + y
+            else:
+                res = x + y
         elif op == '-':
             res = x - y
         elif op == '*':
@@ -149,6 +207,34 @@ class JavaInterpreter(Interpreter):
             raise RuntimeErr("Array index out of bounds: %d" % (i,))
 
         return a[i]
+
+    def execute_length(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return len(v)
+
+    def execute_parseInt(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return int(v)
+
+    def execute_valueOf(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return str(v)
+
+    @libcall('float')
+    def execute_floor(self, x):
+        return math.floor(x)
+
+    @libcall('float')
+    def execute_ceil(self, x):
+        return math.ceil(x)
+
+    @libcall('float', 'float')
+    def execute_pow(self, x, y):
+        return math.pow(x, y)
+
+    @libcall('float')
+    def execute_log10(self, x):
+        return math.log(x)
 
     def tonumeric(self, v):
         if v in [True, False]:

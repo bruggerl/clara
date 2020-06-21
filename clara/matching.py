@@ -265,8 +265,8 @@ class Matching(object):
         for i, a in zip(ins, args):
 
             # Run both programs on each input and arg
-            t1 = I.run(P, ins=i, args=a)
-            t2 = I.run(Q, ins=i, args=a)
+            t1 = I.run(P, ins=i, args=a, entryfnc=entryfnc)
+            t2 = I.run(Q, ins=i, args=a, entryfnc=entryfnc)
 
             T1.append(t1)
             # self.debug("P1: %s", t1)

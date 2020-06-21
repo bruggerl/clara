@@ -22,7 +22,7 @@ def isprimed(var):
 
 def prime(var):
     assert not isprimed(var), 'Variable already primed!'
-    
+
     if isinstance(var, str):
         return "%s'" % (var,)
 
@@ -32,7 +32,6 @@ def prime(var):
 
 
 def unprime(var):
-
     assert isprimed(var), 'Variable not primed!'
 
     if isinstance(var, str):
@@ -48,20 +47,22 @@ class Expr(object):
     An expression
     '''
 
-    def __init__(self, line=None, statement=False, original=None):
+    def __init__(self, line=None, statement=False, original=None, obj=None):
         self.line = line
         self.statement = statement
         self.original = original
+        self.obj = obj
 
     def copyargs(self):
         return {'line': self.line,
                 'statement': self.statement,
-                'original': self.original}
+                'original': self.original,
+                'obj': self.obj}
 
     def replace_original(self, d):
         if not self.original:
             return
-        
+
         if self.original[0] in d:
             self.original = (d[self.original[0]],
                              self.original[1])
@@ -72,21 +73,21 @@ class Expr(object):
         else:
             return s
 
-    
+
 class Var(Expr):
     '''
     Variable
     '''
 
     def __init__(self, name, primed=False, *args, **kwargs):
-        
+
         super(Var, self).__init__(*args, **kwargs)
 
         assert isinstance(name, str), \
             "Variable name should be string or unicode, got '%s'" % (name,)
         assert isinstance(primed, bool), \
             "Variable 'primed' should be bool, got '%s'" % (primed,)
-        
+
         self.name = str(name)
         self.primed = primed
 
@@ -126,14 +127,14 @@ class Var(Expr):
 
     def tostring(self):
         return self.expr_original(repr(self))
-    
+
     def __repr__(self):
         if self.primed:
             return "%s'" % (self.name,)
         else:
             return self.name
-            
-        #return self.expr_original(s)
+
+        # return self.expr_original(s)
 
     def __eq__(self, other):
         if other is None: return False
@@ -145,8 +146,8 @@ class Var(Expr):
 
     def __hash__(self):
         return hash((self.name, self.primed))
-    
-        
+
+
 class Const(Expr):
     '''
     Constant
@@ -158,7 +159,7 @@ class Const(Expr):
 
         assert isinstance(value, str), \
             "Constant value should be string, got '%s'" % (value,)
-        
+
         self.value = str(value)
 
     def copy(self):
@@ -183,7 +184,7 @@ class Const(Expr):
 
     def __repr__(self):
         return self.value
-        #return self.expr_original(s)
+        # return self.expr_original(s)
 
     def __eq__(self, other):
         if other is None: return False
@@ -195,7 +196,7 @@ class Const(Expr):
 
     def __hash__(self):
         return hash(self.value)
-        
+
 
 class Op(Expr):
     '''
@@ -243,17 +244,28 @@ class Op(Expr):
                       set())
 
     def tostring(self):
-        s = '%s(%s)' % (self.name, ', '.join(
-            [x.tostring() for x in self.args]))
+        if self.obj:
+            s = '%s(%s(%s))' % (self.name, self.obj, ', '.join(
+                [x.tostring() for x in self.args]))
+        else:
+            s = '%s(%s)' % (self.name, ', '.join(
+                [x.tostring() for x in self.args]))
+
         return self.expr_original(s)
 
     def __repr__(self):
-        return '%s(%s)' % (self.name, ', '.join(map(str, self.args)))
+        if self.obj:
+            return '%s(%s(%s))' % (self.name, self.obj, ', '.join(map(str, self.args)))
+        else:
+            return '%s(%s)' % (self.name, ', '.join(map(str, self.args)))
 
     def __eq__(self, other):
         if other is None: return False
         if not isinstance(other, Op): return False
         if self.name != other.name: return False
+        if self.obj:
+            if self.obj != other.obj:
+                return False
         if len(self.args) != len(other.args): return False
         for arg1, arg2 in zip(self.args, other.args):
             if arg1 != arg2: return False
@@ -265,26 +277,26 @@ class Op(Expr):
     def __hash__(self):
         return hash((self.name, tuple(self.args)))
 
-    
+
 def expr_to_dict(e):
     d = None
 
     if isinstance(e, Var):
         d = {'type': 'Var', 'name': e.name, 'primed': e.primed}
-    
+
     elif isinstance(e, Const):
         d = {'type': 'Const', 'value': e.value}
 
     else:
         d = {'type': 'Op', 'name': e.name,
-                'args': list(map(expr_to_dict, e.args))}
+             'args': list(map(expr_to_dict, e.args))}
 
     d['original'] = e.original
 
     return d
 
-def dict_to_expr(d):
 
+def dict_to_expr(d):
     if d['type'] == 'Var':
         e = Var(name=d['name'], primed=d['primed'])
 
@@ -293,10 +305,11 @@ def dict_to_expr(d):
 
     else:
         e = Op(d['name'], *list(map(dict_to_expr, d['args'])))
-    
+
     e.original = d['original']
 
     return e
+
 
 class Program(object):
     '''
@@ -343,7 +356,7 @@ class Program(object):
         return '\n\n'.join([x.tostring() for x in list(self.fncs.values())])
 
     def getstruct(self):
-        
+
         s = []
         for fname in sorted(self.fncs):
             sf = []
@@ -361,7 +374,7 @@ class Program(object):
                     todo.append(fnc.trans(loc, True))
                 if fnc.trans(loc, False) is not None:
                     todo.append(fnc.trans(loc, False))
-                    
+
             for loc in locs:
                 lt = fnc.trans(loc, True)
                 if lt is None:
@@ -407,8 +420,8 @@ class Function(object):
         self.params = list(params)
         self.rettype = rettype
 
-        self.initloc = None   # Initial location
-        self.locexprs = {}   # Location -> (VarxExpr)*
+        self.initloc = None  # Initial location
+        self.locexprs = {}  # Location -> (VarxExpr)*
         self.loctrans = {}  # Location -> {True,False} -> Location
         self.locdescs = {}  # Location -> Str (description)
         self.types = {}  # Var -> Type
@@ -457,7 +470,7 @@ class Function(object):
         '''
 
         assert loc in self.locdescs, "Unknown location: '%s'" % (loc,)
-        
+
         return self.locdescs[loc]
 
     def exprs(self, loc):
@@ -477,7 +490,7 @@ class Function(object):
         for (var2, expr) in self.locexprs[loc]:
             if var == var2:
                 return expr
-            
+
         return Var(var)
 
     def hasexpr(self, loc, var):
@@ -488,7 +501,7 @@ class Function(object):
         for (var2, _) in self.locexprs[loc]:
             if var == var2:
                 return True
-            
+
         return False
 
     def numexprs(self, loc):
@@ -540,7 +553,7 @@ class Function(object):
         '''
 
         # Check
-        assert loc1 in self.locexprs,\
+        assert loc1 in self.locexprs, \
             "Unknown location: '%s'" % (loc1,)
         assert loc2 in self.locexprs, \
             "Unknown location: '%s'" % (loc2,)
@@ -605,7 +618,7 @@ class Function(object):
 
         if var in self.types and skiponexist:
             return
-        
+
         self.types[var] = type
 
     def gettype(self, var):
@@ -640,7 +653,7 @@ class Function(object):
         for loc in self.locs():
             usedpre[loc] = set([])
             usedpost[loc] = set([])
-            
+
             for (_, expr) in self.exprs(loc):
                 used = expr.vars()
                 usedpre[loc] |= set([x for x in used if not isprimed(x)])
@@ -677,7 +690,7 @@ class Function(object):
 
             for loc in locs:
                 n, m = len(livein[loc]), len(liveout[loc])
-                
+
                 livein[loc] = used[loc] | (liveout[loc] - assigned[loc])
 
                 for sloc in succ[loc]:
@@ -707,15 +720,15 @@ class Function(object):
 
                 for v, e in list(m.items()):
                     expr = expr.replace(v, e.copy(), primedonly=True)
-                
+
                 # Definitively unsed var!
                 if var not in SPECIAL_VARS and var not in usedpost[loc] \
-                   and var not in liveout[loc]:
+                        and var not in liveout[loc]:
                     continue
 
                 # This variable can be merged
                 if var not in SPECIAL_VARS and var not in liveout[loc] \
-                   and merge:
+                        and merge:
                     m[var] = expr
                     continue
 
@@ -743,9 +756,9 @@ class Function(object):
         ]
         for loc in sorted(self.locexprs.keys()):
             s.append('')
-            s.append('Loc %d (%s)' % (loc,self.locdescs[loc]))
+            s.append('Loc %d (%s)' % (loc, self.locdescs[loc]))
             s.append('-' * 39)
-            
+
             for (var, expr) in self.locexprs[loc]:
                 s.append('  %s := %s' % (var, expr.tostring()))
 
@@ -755,7 +768,7 @@ class Function(object):
                 self.loctrans[loc][True], self.loctrans[loc][False]))
 
         return '\n'.join(s)
-        
+
     def __repr__(self):
         s = [
             'fun %s (%s) : %s' % (self.name,
@@ -766,9 +779,9 @@ class Function(object):
         ]
         for loc in sorted(self.locexprs.keys()):
             s.append('')
-            s.append('Loc %d (%s)' % (loc,self.locdescs[loc]))
+            s.append('Loc %d (%s)' % (loc, self.locdescs[loc]))
             s.append('-' * 39)
-            
+
             for (var, expr) in self.locexprs[loc]:
                 s.append('  %s := %s' % (var, expr))
 
