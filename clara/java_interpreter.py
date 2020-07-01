@@ -4,7 +4,7 @@ JAVA interpreter
 
 # clara lib imports
 from .interpreter import Interpreter, addlanginter, RuntimeErr, UndefValue
-from .model import Const
+from .model import Var
 
 import math
 
@@ -99,19 +99,12 @@ class JavaInterpreter(Interpreter):
         return self.tonumeric(res)
 
     def execute_BinaryOp(self, op, x, y, mem):
-        x_str = False
-        y_str = False
+        t = None
 
-        if isinstance(x, Const) and len(x.value) >= 2 and x.value[0] == x.value[-1] == '"':
-            x_str = True
-            x = self.execute(x, mem)
+        if isinstance(x, Var):
+            t = x.type
 
-        if isinstance(y, Const) and len(y.value) >= 2 and y.value[0] == y.value[-1] == '"':
-            y_str = True
-            y = self.execute(y, mem)
-
-        if not x_str:
-            x = self.tonumeric(self.execute(x, mem))
+        x = self.tonumeric(self.execute(x, mem))
 
         # Special case for short-circut
         if op in ['&&', '||']:
@@ -124,19 +117,12 @@ class JavaInterpreter(Interpreter):
 
             return self.tonumeric(self.execute(y, mem))
 
-        if not y_str:
-            y = self.tonumeric(self.execute(y, mem))
+        y = self.tonumeric(self.execute(y, mem))
 
-        if not x_str and not y_str:
-            x, y = self.togreater(x, y)
+        x, y = self.togreater(x, y)
 
         if op == '+':
-            if isinstance(x, str):
-                res = x + '{}'.format(y)
-            elif isinstance(y, str):
-                res = '{}'.format(x) + y
-            else:
-                res = x + y
+            res = x + y
         elif op == '-':
             res = x - y
         elif op == '*':
@@ -165,6 +151,11 @@ class JavaInterpreter(Interpreter):
             res = x | y
         else:
             assert False, 'Unknown binary op: %s' % (op,)
+
+        if isinstance(x, int):
+            if t and t != 'int':
+                return res
+            return int(res)
 
         return res
 
@@ -226,15 +217,22 @@ class JavaInterpreter(Interpreter):
 
     @libcall('float')
     def execute_ceil(self, x):
+        if x == float('-inf'):
+            return x
         return math.ceil(x)
 
     @libcall('float', 'float')
     def execute_pow(self, x, y):
-        return math.pow(x, y)
+        try:
+            return math.pow(x, y)
+        except OverflowError:
+            return float('inf')
 
     @libcall('float')
     def execute_log10(self, x):
-        return math.log(x)
+        if x == 0:
+            return float('-inf')
+        return math.log(x, 10)
 
     def tonumeric(self, v):
         if v in [True, False]:

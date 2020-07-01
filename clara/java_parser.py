@@ -63,7 +63,7 @@ class JavaParser(Parser):
             expr = self.visit_expr(decl)
             exprs.append(expr)
 
-        return Op('Constructor', *exprs, obj=type)
+        return Op('Constructor', *exprs, type=type)
 
     def visit_MethodDeclaration(self, node):
         name = node.name
@@ -119,6 +119,9 @@ class JavaParser(Parser):
         for decl in node.declarators:
             name, init = self.visit(decl)
 
+            if isinstance(init, Var):
+                init.type = type
+
             if isinstance(init, Op) and (init.name == 'ArrayCreate' or init.name == 'ArrayInit'):
                 type += '[]'
 
@@ -137,6 +140,9 @@ class JavaParser(Parser):
 
         for decl in node.declarators:
             name, init = self.visit(decl)
+
+            if isinstance(init, Var):
+                init.type = type
 
             if isinstance(init, Op):
                 if init.name == 'ArrayCreate' or init.name == 'ArrayInit':
@@ -291,7 +297,7 @@ class JavaParser(Parser):
             rexpr = Op('ListHead', Const('*'), Var(VAR_IN), line=node.position.line)
             return rexpr
 
-        expr = Var(node.member, line=node.position.line)
+        expr = Var(node.member, line=node.position.line, type=self.fnc.gettype(node.member))
 
         if node.selectors:
             if len(node.selectors) > 1:
@@ -361,6 +367,20 @@ class JavaParser(Parser):
         return self.visit_expr(node.index)
 
     def visit_BinaryOperation(self, node):
+        if node.operator == '+':  # string concatenation
+            l = self.visit_expr(node.operandl)
+            r = self.visit_expr(node.operandr)
+
+            if (isinstance(l, Const) and len(l.value) >= 2 and l.value[0] == l.value[-1] == '"') or \
+                    (isinstance(l, Var) and self.fnc.gettype(l.name) == 'String') or \
+                    (isinstance(l, Op) and l.name == 'StrAppend'):
+                return Op('StrAppend', l, r)
+
+            if (isinstance(r, Const) and len(r.value) >= 2 and r.value[0] == r.value[-1] == '"') or \
+                    (isinstance(r, Var) and self.fnc.gettype(r.name) == 'String') or \
+                    (isinstance(r, Op) and r.name == 'StrAppend'):
+                return Op('StrAppend', l, r)
+
         return Op(node.operator, self.visit_expr(node.operandl), self.visit_expr(node.operandr))
 
     def visit_TernaryExpression(self, node):

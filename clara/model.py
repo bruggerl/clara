@@ -47,17 +47,17 @@ class Expr(object):
     An expression
     '''
 
-    def __init__(self, line=None, statement=False, original=None, obj=None):
+    def __init__(self, line=None, statement=False, original=None, type=None):
         self.line = line
         self.statement = statement
         self.original = original
-        self.obj = obj
+        self.type = type
 
     def copyargs(self):
         return {'line': self.line,
                 'statement': self.statement,
                 'original': self.original,
-                'obj': self.obj}
+                'type': self.type}
 
     def replace_original(self, d):
         if not self.original:
@@ -244,8 +244,8 @@ class Op(Expr):
                       set())
 
     def tostring(self):
-        if self.obj:
-            s = '%s(%s(%s))' % (self.name, self.obj, ', '.join(
+        if self.type:
+            s = '%s(%s(%s))' % (self.name, self.type, ', '.join(
                 [x.tostring() for x in self.args]))
         else:
             s = '%s(%s)' % (self.name, ', '.join(
@@ -254,8 +254,8 @@ class Op(Expr):
         return self.expr_original(s)
 
     def __repr__(self):
-        if self.obj:
-            return '%s(%s(%s))' % (self.name, self.obj, ', '.join(map(str, self.args)))
+        if self.type:
+            return '%s(%s(%s))' % (self.name, self.type, ', '.join(map(str, self.args)))
         else:
             return '%s(%s)' % (self.name, ', '.join(map(str, self.args)))
 
@@ -263,8 +263,8 @@ class Op(Expr):
         if other is None: return False
         if not isinstance(other, Op): return False
         if self.name != other.name: return False
-        if self.obj:
-            if self.obj != other.obj:
+        if self.type:
+            if self.type != other.type:
                 return False
         if len(self.args) != len(other.args): return False
         for arg1, arg2 in zip(self.args, other.args):
