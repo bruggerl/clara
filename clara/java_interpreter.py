@@ -4,7 +4,7 @@ JAVA interpreter
 
 # clara lib imports
 from .interpreter import Interpreter, addlanginter, RuntimeErr, UndefValue
-from .model import Var
+from .model import Var, VAR_IN
 
 import math
 
@@ -43,7 +43,7 @@ def libcall(*args):
 
 class JavaInterpreter(Interpreter):
     BINARY_OPS = {'+', '-', '*', '/', '%', '<', '<=', '>', '>=', '==', '!=',
-                  '^', '&', '!', '&&', '||'}
+                  '^', '&', '!', '&&', '||', '<<', '>>'}
 
     UNARY_OPS = {'!', '-', '+'}
 
@@ -59,8 +59,14 @@ class JavaInterpreter(Interpreter):
         # Char
         if len(c.value) >= 3 and c.value[0] == c.value[-1] == "'":
             try:
-                ch = c.value[1:-1].decode('string_escape')
-                if len(ch) == 1:
+                ch = c.value[1:-1]
+                if len(ch) <= 2:
+                    if ch == '\\\\':
+                        return ord('\\')
+                    elif ch == '\\n':
+                        return ord('\n')
+                    elif ch == '\\t':
+                        return ord('\t')
                     return ord(ch)
             except ValueError:
                 pass
@@ -149,6 +155,10 @@ class JavaInterpreter(Interpreter):
             res = x & y
         elif op == '|':
             res = x | y
+        elif op == '<<':
+            res = x << y
+        elif op == '>>':
+            res = x >> y
         else:
             assert False, 'Unknown binary op: %s' % (op,)
 
@@ -164,6 +174,12 @@ class JavaInterpreter(Interpreter):
         x = self.execute(c.args[1], mem)
 
         return self.convert(x, t)
+
+    def execute_ClassCreate(self, cc, mem):
+        if cc.type != 'Scanner':
+            raise NotImplementedError('Constructors for other classes than Scanner not supported')
+
+        return cc.type
 
     def execute_ArrayCreate(self, ac, mem):
         x = int(self.tonumeric(self.execute(ac.args[0], mem)))
@@ -199,6 +215,19 @@ class JavaInterpreter(Interpreter):
 
         return a[i]
 
+    def execute_hasNext(self, op, mem):
+        if mem[VAR_IN] and isinstance(mem[VAR_IN], list) and len(mem[VAR_IN]) > 0:
+            return True
+        else:
+            return False
+
+    def execute_hasNextInt(self, op, mem):
+        if mem[VAR_IN] and isinstance(mem[VAR_IN], list) and len(mem[VAR_IN]) > 0:
+            if isinstance(mem[VAR_IN][0], int):
+                return True
+        else:
+            return False
+
     def execute_length(self, op, mem):
         v = self.execute(op.args[0], mem)
         return len(v)
@@ -210,6 +239,16 @@ class JavaInterpreter(Interpreter):
     def execute_valueOf(self, op, mem):
         v = self.execute(op.args[0], mem)
         return str(v)
+
+    def execute_charAt(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return v[op.args[1]]
+
+    def execute_equals(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        return u == v
 
     @libcall('float')
     def execute_floor(self, x):
@@ -233,6 +272,15 @@ class JavaInterpreter(Interpreter):
         if x == 0:
             return float('-inf')
         return math.log(x, 10)
+
+    @libcall('float')
+    def execute_abs(self, x):
+        return abs(x)
+
+    def execute_floorDiv(self, op, mem):
+        x = self.execute(op.args[0], mem)
+        y = self.execute(op.args[1], mem)
+        return x // y
 
     def tonumeric(self, v):
         if v in [True, False]:

@@ -34,7 +34,7 @@ class Interpreter(object):
 
     DEFAULT_RETURN = UndefValue()
 
-    def __init__(self, timeout=5, entryfnc='main'):
+    def __init__(self, timeout=None, entryfnc='main'):
         self.timeout = timeout
         self.starttime = None
         self.entryfnc = entryfnc
@@ -180,7 +180,6 @@ class Interpreter(object):
         return newmem, mem
 
     def execute_Op(self, op, mem):
-
         if op.name in self.UNARY_OPS:
             if len(op.args) != 1 and op.name not in self.BINARY_OPS:
                 raise RuntimeError(

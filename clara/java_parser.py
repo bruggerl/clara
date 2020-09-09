@@ -10,14 +10,14 @@ import javalang
 
 
 class JavaParser(Parser):
-    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil'}
+    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil', 'abs', 'floorDiv'}
 
     TYPES_CLASSES = {'String', 'Integer', 'Double', 'Float'}
     TYPES_FNCS = {'valueOf', 'parseInt'}
 
-    SCANNER_FNCS = {'next', 'nextLine', 'nextInt', 'nextDouble', 'nextFloat', 'hasNext', 'hasNextInt'}
+    SCANNER_FNCS = {'next', 'nextLine', 'nextInt', 'nextDouble', 'nextFloat', 'hasNext', 'hasNextInt', 'close'}
 
-    STRING_FNCS = {'length', 'substring'}
+    STRING_FNCS = {'length', 'substring', 'concat', 'charAt', 'equals'}
 
     NOTOP = '!'
     OROP = '||'
@@ -63,7 +63,7 @@ class JavaParser(Parser):
             expr = self.visit_expr(decl)
             exprs.append(expr)
 
-        return Op('Constructor', *exprs, type=type)
+        return Op('ClassCreate', *exprs, type=type)
 
     def visit_MethodDeclaration(self, node):
         name = node.name

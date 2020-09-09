@@ -229,7 +229,7 @@ class Matching(object):
         return sm
         
     def match_programs(self, P, Q, inter, ins=None, args=None,
-                       entryfnc=None, timeout=5):
+                       entryfnc=None, timeout=None):
 
         # Check inputs and arguments
         assert ins or args, "Inputs or argument required"
