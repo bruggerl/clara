@@ -32,6 +32,8 @@ class JavaParser(Parser):
 
         self.fnc_names = []
 
+        self.calling_fncs = {}  # fnc name -> [calling fnc names] (needed if method is called before declaration)
+
     def parse(self, code):
         """
         Parses JAVA code
@@ -51,6 +53,8 @@ class JavaParser(Parser):
 
     def visit_ClassDeclaration(self, node):
         self.fnc_names = [e.name for e in node.body if e.__class__.__name__ == 'MethodDeclaration']
+        for fnc in self.fnc_names:
+            self.calling_fncs[fnc] = []
 
         for e in node.body:
             self.visit(e)
@@ -77,6 +81,7 @@ class JavaParser(Parser):
             params.append((param_name, param_type))
 
         self.addfnc(name, params, rtype)
+        self.fnc.add_calling_fncs(self.calling_fncs[name])
 
         for v, t in params:
             self.addtype(v, t)
@@ -221,6 +226,14 @@ class JavaParser(Parser):
 
         elif node.member in self.fnc_names:
             expr = Var(node.member, line=node.position.line)
+
+            called_fnc = self.fncs.get(node.member, None)
+            if called_fnc and self.fnc:
+                called_fnc.add_calling_fncs([self.fnc.name])
+            elif not called_fnc and self.fnc:
+                if self.fnc.name not in self.calling_fncs[node.member]:
+                    self.calling_fncs[node.member].append(self.fnc.name)
+
             return Op('FuncCall', expr, *args, line=node.position.line)
 
         elif self.fnc.gettype(node.qualifier) == 'String' and node.member in self.STRING_FNCS:
@@ -316,6 +329,9 @@ class JavaParser(Parser):
 
             elif node.prefix_operators[0] == '-':
                 return Op('-', expr, line=node.position.line)
+
+            elif node.prefix_operators[0] == '!':
+                return Op('!', expr, line=node.position.line)
 
         if node.postfix_operators:
             if node.postfix_operators[0] in ['--', '++']:

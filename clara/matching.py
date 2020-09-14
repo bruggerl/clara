@@ -6,6 +6,7 @@ Simulation relation
 from .common import debug, equals
 from .interpreter import Interpreter, RuntimeErr, UndefValue, isundef
 from .model import SPECIAL_VARS, VAR_RET, VAR_IN, VAR_OUT, isprimed, prime
+from .java_interpreter import JavaInterpreter
 
 
 class Matching(object):
@@ -162,10 +163,14 @@ class Matching(object):
                 return
         return (sm, newmatch)
 
-    def match_struct(self, P, Q):
+    def match_struct(self, P, Q, entryfnc):
 
         fncs1 = P.getfncnames()
         fncs2 = Q.getfncnames()
+
+        if entryfnc:
+            fncs1 = P.getreachablefncnames(entryfnc)
+            fncs2 = Q.getreachablefncnames(entryfnc)
 
         # Go through all functions
         sm = {}
@@ -242,8 +247,15 @@ class Matching(object):
             assert len(ins) == len(args), \
                 "Equal number of inputs and arguments expected"
 
+        # Create interpreter
+        I = inter(timeout=timeout, entryfnc=entryfnc)
+
         # Check struct
-        sm = self.match_struct(P, Q)
+        if isinstance(I, JavaInterpreter):
+            sm = self.match_struct(P, Q, entryfnc=entryfnc)
+        else:
+            sm = self.match_struct(P, Q, entryfnc=None)
+
         if sm is None:
             self.debug("No struct match!")
             return
@@ -253,9 +265,6 @@ class Matching(object):
             ins = [None for _ in range(len(args))]
         if not args:
             args = [None for _ in range(len(ins))]
-
-        # Create interpreter
-        I = inter(timeout=timeout, entryfnc=entryfnc)
 
         # Init traces
         T1 = []
@@ -271,7 +280,7 @@ class Matching(object):
             T1.append(t1)
             # self.debug("P1: %s", t1)
             T2.append(t2)
-            # self.debug("P1: %s", t2)
+            # self.debug("P2: %s", t2)
 
         self.debug("Programs executed, matching traces")
 

@@ -7,8 +7,8 @@ class Clustering(object):
     def __init__(self, matching):
         self.matching = matching
 
-    def extract_exprs(self, cprog, prog, sm, m):
-        fncs1 = cprog.getfncs()
+    def extract_exprs(self, cprog, prog, sm, m, entryfnc=None):
+        fncs1 = cprog.getreachablefncs(entryfnc) if entryfnc else cprog.getfncs()
         anymod = False
 
         # Iterate all functions
@@ -63,11 +63,14 @@ class Clustering(object):
             found = False
             for i, cprog in enumerate(clusters):
                 m = self.matching.match_programs(
-                    cprog, prog, inter, ins=ins, args=args, entryfnc=entryfnc)
+                    cprog, prog, inter, ins=ins, args=args, entryfnc=entryfnc, timeout=10)
                 if not m: continue
-                
 
-                modified = self.extract_exprs(cprog, prog, m[0], m[1])
+                if inter.__name__ == 'JavaInterpreter':
+                    modified = self.extract_exprs(cprog, prog, m[0], m[1], entryfnc=entryfnc)
+                else:
+                    modified = self.extract_exprs(cprog, prog, m[0], m[1], entryfnc=None)
+
                 if modified:
                     modset.add(i)
                 

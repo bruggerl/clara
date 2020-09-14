@@ -333,6 +333,16 @@ class Program(object):
     def getfncnames(self):
         return list(self.fncs.keys())
 
+    def getreachablefncs(self, entryfnc):
+        l = [fnc for fnc in self.getfncs() if entryfnc in self.getfnc(fnc.name).calling_fncs]
+        l.append(self.getfnc(entryfnc))
+        return l
+
+    def getreachablefncnames(self, entryfnc):
+        l = [name for name in self.getfncnames() if entryfnc in self.getfnc(name).calling_fncs]
+        l.append(entryfnc)
+        return l
+
     def rmfnc(self, name):
         del self.fncs[name]
 
@@ -425,6 +435,12 @@ class Function(object):
         self.loctrans = {}  # Location -> {True,False} -> Location
         self.locdescs = {}  # Location -> Str (description)
         self.types = {}  # Var -> Type
+        self.calling_fncs = []  # list of fnc names
+
+    def add_calling_fncs(self, fnc_names):
+        for fnc_name in fnc_names:
+            if fnc_name not in self.calling_fncs:
+                self.calling_fncs.append(fnc_name)
 
     def addloc(self, loc=None, desc=None):
         '''

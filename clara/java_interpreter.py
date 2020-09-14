@@ -45,6 +45,8 @@ class JavaInterpreter(Interpreter):
     BINARY_OPS = {'+', '-', '*', '/', '%', '<', '<=', '>', '>=', '==', '!=',
                   '^', '&', '!', '&&', '||', '<<', '>>'}
 
+    BINARY_BOOL_OPS = {'==', '!=', '&&', '||', '<', '<=', '>', '>='}
+
     UNARY_OPS = {'!', '-', '+'}
 
     def execute_Const(self, c, mem):
@@ -162,9 +164,10 @@ class JavaInterpreter(Interpreter):
         else:
             assert False, 'Unknown binary op: %s' % (op,)
 
-        if isinstance(x, int):
+        if isinstance(x, int) and op not in self.BINARY_BOOL_OPS:
             if t and t != 'int':
                 return res
+
             return int(res)
 
         return res
