@@ -333,13 +333,30 @@ class Program(object):
     def getfncnames(self):
         return list(self.fncs.keys())
 
+    def getcallingfncsrec(self, fnc):
+        if fnc.calling_fncs:
+            l = fnc.calling_fncs
+
+            for cl in fnc.calling_fncs:
+                if cl != fnc.name:
+                    f = self.getfnc(cl)
+                    cf = self.getcallingfncsrec(f)
+
+                    for c in cf:
+                        if c not in l:
+                            l.append(c)
+
+            return l
+        else:
+            return []
+
     def getreachablefncs(self, entryfnc):
-        l = [fnc for fnc in self.getfncs() if entryfnc in self.getfnc(fnc.name).calling_fncs]
+        l = [fnc for fnc in self.getfncs() if entryfnc in self.getcallingfncsrec(self.getfnc(fnc.name))]
         l.append(self.getfnc(entryfnc))
         return l
 
     def getreachablefncnames(self, entryfnc):
-        l = [name for name in self.getfncnames() if entryfnc in self.getfnc(name).calling_fncs]
+        l = [name for name in self.getfncnames() if entryfnc in self.getcallingfncsrec(self.getfnc(name))]
         l.append(entryfnc)
         return l
 
