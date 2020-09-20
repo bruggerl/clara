@@ -138,7 +138,7 @@ class Repair(object):
 
         # (1) Check struct match
         M = Matching(verbose=self.verbose)
-        self.sm = M.match_struct(P, Q)
+        self.sm = M.match_struct(P, Q, entryfnc=None)
         if self.sm is None:
             raise StructMismatch('')
 
