@@ -10,14 +10,17 @@ import javalang
 
 
 class JavaParser(Parser):
-    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil', 'abs', 'floorDiv'}
+    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil', 'abs', 'floorDiv', 'max'}
 
-    TYPES_CLASSES = {'String', 'Integer', 'Double', 'Float'}
-    TYPES_FNCS = {'valueOf', 'parseInt'}
+    TYPES_CLASSES = {'String', 'Integer', 'Double', 'Float', 'Character'}
+    TYPES_FNCS = {'valueOf', 'parseInt', 'isDigit', 'toString', 'isLetter', 'isSpace'}
 
-    SCANNER_FNCS = {'next', 'nextLine', 'nextInt', 'nextDouble', 'nextFloat', 'hasNext', 'hasNextInt', 'close'}
+    SCANNER_FNCS = {'next', 'nextLine', 'nextInt', 'nextDouble', 'nextFloat', 'hasNext',
+                    'hasNextInt', 'close'}
 
-    STRING_FNCS = {'length', 'substring', 'concat', 'charAt', 'equals'}
+    STRING_FNCS = {'length', 'substring', 'concat', 'charAt', 'equals', 'isEmpty',
+                   'startsWith', 'endsWith', 'replace', 'replaceAll', 'replaceFirst',
+                   'indexOf', 'contains'}
 
     NOTOP = '!'
     OROP = '||'
@@ -270,7 +273,7 @@ class JavaParser(Parser):
         # Extract format and args
         if len(args) == 0:
             self.addwarn("'printf' with zero args at line %s" % (
-                node.coord.line,))
+                node.position.line,))
             fmt = Const('?', line=node.position.line)
         else:
             if isinstance(args[0], Const):
@@ -278,8 +281,8 @@ class JavaParser(Parser):
                 args = args[1:]
             else:
                 self.addwarn("First argument of 'printf' at lines %s should \
-        be a format" % (node.coord.line,))
-                fmt = Const('?', line=node.coord.line)
+        be a format" % (node.position.line,))
+                fmt = Const('?', line=node.position.line)
 
         fmt.value = fmt.value.replace('%lf', '%f')
         fmt.value = fmt.value.replace('%ld', '%d')

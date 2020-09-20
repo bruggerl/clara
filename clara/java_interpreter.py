@@ -253,6 +253,77 @@ class JavaInterpreter(Interpreter):
 
         return u == v
 
+    def execute_isEmpty(self, op, mem):
+        v = self.execute(op.args[0], mem)
+
+        return True if len(v) == 0 else False
+
+    def execute_startsWith(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        return u.startswith(v)
+
+    def execute_endsWith(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        return u.endswith(v)
+
+    def execute_replace(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+        w = self.execute(op.args[2], mem)
+
+        return u.replace(v, w)
+
+    def execute_replaceAll(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+        w = self.execute(op.args[2], mem)
+
+        return u.replace(v, w)
+
+    def execute_replaceFirst(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+        w = self.execute(op.args[2], mem)
+
+        return u.replace(v, w, 1)
+
+    def execute_indexOf(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        try:
+            return u.index(v)
+        except ValueError:
+            return -1
+
+    def execute_contains(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        return v in u
+
+    def execute_isDigit(self, op, mem):
+        v = self.execute(op.args[0], mem)
+
+        return v.isdigit()
+
+    def execute_isLetter(self, op, mem):
+        v = self.execute(op.args[0], mem)
+
+        return v.isalpha()
+
+    def execute_isSpace(self, op, mem):
+        v = self.execute(op.args[0], mem)
+
+        return v.isspace()
+
+    def execute_toString(self, op, mem):
+        return self.execute(op.args[0], mem)
+
     @libcall('float')
     def execute_floor(self, x):
         return math.floor(x)
@@ -279,6 +350,10 @@ class JavaInterpreter(Interpreter):
     @libcall('float')
     def execute_abs(self, x):
         return abs(x)
+
+    @libcall('float', 'float')
+    def execute_max(self, x, y):
+        return max(x, y)
 
     def execute_floorDiv(self, op, mem):
         x = self.execute(op.args[0], mem)

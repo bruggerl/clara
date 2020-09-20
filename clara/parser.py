@@ -280,13 +280,11 @@ class Parser(object):
                 return res
 
         if res and not isinstance(res, Expr):
-            raise ParseError("Expected expression, got '%s'" % (res,),
-                             line=node.coord.line)
+            raise ParseError("Expected expression, got '%s'" % (res,))
 
         if (not res) and (not allownone):
             if node:
-                self.addwarn("Expression expected at line %s" % (
-                    node.coord.line,))
+                self.addwarn("Expression expected")
             else:
                 self.addwarn("Expression expected")
             res = Const('?')
