@@ -10,10 +10,12 @@ import javalang
 
 
 class JavaParser(Parser):
-    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil', 'abs', 'floorDiv', 'max'}
+    MATH_FNCS = {'pow', 'log10', 'floor', 'ceil', 'abs', 'floorDiv', 'max', 'min', 'signum'}
 
-    TYPES_CLASSES = {'String', 'Integer', 'Double', 'Float', 'Character'}
-    TYPES_FNCS = {'valueOf', 'parseInt', 'isDigit', 'toString', 'isLetter', 'isSpace'}
+    STATIC_FNCS = {'String': ['valueOf'],
+                   'Integer': ['parseInt', 'toString', 'valueOf', 'sum', 'max', 'min'],
+                   'Character': ['isDigit', 'toString', 'isLetter', 'isSpace'],
+                   'Arrays': ['toString', 'equals', 'copyOfRange', 'copyOf', 'sort']}
 
     SCANNER_FNCS = {'next', 'nextLine', 'nextInt', 'nextDouble', 'nextFloat', 'hasNext',
                     'hasNextInt', 'close'}
@@ -21,6 +23,8 @@ class JavaParser(Parser):
     STRING_FNCS = {'length', 'substring', 'concat', 'charAt', 'equals', 'isEmpty',
                    'startsWith', 'endsWith', 'replace', 'replaceAll', 'replaceFirst',
                    'indexOf', 'contains'}
+
+    ARR_FNCS = {'clone'}
 
     NOTOP = '!'
     OROP = '||'
@@ -224,7 +228,19 @@ class JavaParser(Parser):
         elif node.qualifier == 'Math' and node.member in self.MATH_FNCS:
             return Op(node.member, *args, line=node.position.line)
 
-        elif node.qualifier in self.TYPES_CLASSES and node.member in self.TYPES_FNCS:
+        elif node.qualifier in self.STATIC_FNCS.keys() and \
+                node.member in self.STATIC_FNCS.get(node.qualifier):
+            if node.qualifier == 'Integer':
+                if node.member == 'toString':
+                    return Op('IntegertoString', *args, line=node.position.line)
+                elif node.member == 'valueOf':
+                    return Op('IntegervalueOf', *args, line=node.position.line)
+            elif node.qualifier == 'Arrays':
+                if node.member == 'toString':
+                    return Op('ArraystoString', *args, line=node.position.line)
+                elif node.member == 'equals':
+                    return Op('Arraysequals', *args, line=node.position.line)
+
             return Op(node.member, *args, line=node.position.line)
 
         elif node.member in self.fnc_names:
@@ -239,11 +255,13 @@ class JavaParser(Parser):
 
             return Op('FuncCall', expr, *args, line=node.position.line)
 
-        elif self.fnc.gettype(node.qualifier) == 'String' and node.member in self.STRING_FNCS:
+        elif self.fnc.gettype(node.qualifier) == 'String' and \
+                node.member in self.STRING_FNCS:
             expr = Var(node.qualifier, line=node.position.line)
             return Op(node.member, expr, *args, line=node.position.line)
 
-        elif self.fnc.gettype(node.qualifier) == 'Scanner' and node.member in self.SCANNER_FNCS:
+        elif self.fnc.gettype(node.qualifier) == 'Scanner' and \
+                node.member in self.SCANNER_FNCS:
             if node.member.startswith('next'):
                 t = node.member.split('next')[1].lower()
 
@@ -255,6 +273,12 @@ class JavaParser(Parser):
                 return rexpr
             else:
                 return Op(node.member, *args, line=node.position.line)
+
+        elif isinstance(self.fnc.gettype(node.qualifier), str) and \
+                self.fnc.gettype(node.qualifier).endswith('[]') and \
+                node.member in self.ARR_FNCS:
+            expr = Var(node.qualifier, line=node.position.line)
+            return Op(node.member, expr, *args, line=node.position.line)
 
         else:
             raise NotSupported(
@@ -311,6 +335,12 @@ class JavaParser(Parser):
     def visit_MemberReference(self, node):
         if node.qualifier == 'System' and node.member == 'in':
             rexpr = Op('ListHead', Const('*'), Var(VAR_IN), line=node.position.line)
+            return rexpr
+        elif self.fnc.gettype(node.qualifier) and \
+                self.fnc.gettype(node.qualifier).endswith('[]') and \
+                node.member == 'length':
+            arg = Var(node.qualifier, line=node.position.line, type=self.fnc.gettype(node.qualifier))
+            rexpr = Op('length', arg, line=node.position.line)
             return rexpr
 
         expr = Var(node.member, line=node.position.line, type=self.fnc.gettype(node.member))

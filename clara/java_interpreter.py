@@ -50,6 +50,9 @@ class JavaInterpreter(Interpreter):
     UNARY_OPS = {'!', '-', '+'}
 
     def execute_Const(self, c, mem):
+        if c.value == 'null':
+            return None
+
         # Undef
         if c.value == '?':
             return UndefValue()
@@ -112,7 +115,9 @@ class JavaInterpreter(Interpreter):
         if isinstance(x, Var):
             t = x.type
 
-        x = self.tonumeric(self.execute(x, mem))
+        x = self.execute(x, mem)
+        if x and not isinstance(x, list):
+            x = self.tonumeric(x)
 
         # Special case for short-circut
         if op in ['&&', '||']:
@@ -125,7 +130,9 @@ class JavaInterpreter(Interpreter):
 
             return self.tonumeric(self.execute(y, mem))
 
-        y = self.tonumeric(self.execute(y, mem))
+        y = self.execute(y, mem)
+        if y and not isinstance(y, list):
+            y = self.tonumeric(y)
 
         x, y = self.togreater(x, y)
 
@@ -239,6 +246,20 @@ class JavaInterpreter(Interpreter):
         v = self.execute(op.args[0], mem)
         return int(v)
 
+    def execute_IntegertoString(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return str(v)
+
+    def execute_IntegervalueOf(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        return int(v)
+
+    def execute_sum(self, op, mem):
+        u = self.execute(op.args[0], mem)
+        v = self.execute(op.args[1], mem)
+
+        return u + v
+
     def execute_valueOf(self, op, mem):
         v = self.execute(op.args[0], mem)
         return str(v)
@@ -324,6 +345,40 @@ class JavaInterpreter(Interpreter):
     def execute_toString(self, op, mem):
         return self.execute(op.args[0], mem)
 
+    def execute_ArraystoString(self, op, mem):
+        arr = self.execute(op.args[0], mem)
+        return '[' + ', '.join(str(a) for a in arr) + ']'
+
+    def execute_Arraysequals(self, op, mem):
+        arr1 = self.execute(op.args[0], mem)
+        arr2 = self.execute(op.args[1], mem)
+
+        return arr1 == arr2
+
+    def execute_copyOfRange(self, op, mem):
+        arr = self.execute(op.args[0], mem)
+        start = self.execute(op.args[1], mem)
+        end = self.execute(op.args[2], mem)
+
+        return arr[start:end]
+
+    def execute_copyOf(self, op, mem):
+        arr = self.execute(op.args[0], mem)
+        length = self.execute(op.args[1], mem)
+
+        if len(arr) < length:
+            return arr + (length - len(arr)) * [0]
+        else:
+            return arr[:length]
+
+    def execute_clone(self, op, mem):
+        return self.execute(op.args[0], mem)
+
+    def execute_sort(self, op, mem):
+        arr = self.execute(op.args[0], mem)
+
+        return arr.sort()
+
     @libcall('float')
     def execute_floor(self, x):
         return math.floor(x)
@@ -355,10 +410,22 @@ class JavaInterpreter(Interpreter):
     def execute_max(self, x, y):
         return max(x, y)
 
+    @libcall('float', 'float')
+    def execute_min(self, x, y):
+        return min(x, y)
+
     def execute_floorDiv(self, op, mem):
         x = self.execute(op.args[0], mem)
         y = self.execute(op.args[1], mem)
         return x // y
+
+    def execute_signum(self, op, mem):
+        x = self.execute(op.args[0], mem)
+
+        if x < 0:
+            return -1
+        else:
+            return 1
 
     def tonumeric(self, v):
         if v in [True, False]:
