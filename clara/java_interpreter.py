@@ -242,6 +242,22 @@ class JavaInterpreter(Interpreter):
         v = self.execute(op.args[0], mem)
         return len(v)
 
+    def execute_substring(self, op, mem):
+        v = self.execute(op.args[0], mem)
+        i = self.execute(op.args[1], mem)
+
+        if len(op.args) > 2:
+            j = self.execute(op.args[2], mem)
+            return v[i:j]
+
+        return v[i:]
+
+    def execute_concat(self, op, mem):
+        a = self.execute(op.args[0], mem)
+        b = self.execute(op.args[1], mem)
+
+        return a + b
+
     def execute_parseInt(self, op, mem):
         v = self.execute(op.args[0], mem)
         return int(v)
