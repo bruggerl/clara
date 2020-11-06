@@ -266,7 +266,8 @@ class JavaInterpreter(Interpreter):
 
     def execute_charAt(self, op, mem):
         v = self.execute(op.args[0], mem)
-        return v[op.args[1]]
+        i = self.execute(op.args[1], mem)
+        return v[i]
 
     def execute_equals(self, op, mem):
         u = self.execute(op.args[0], mem)
