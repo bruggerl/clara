@@ -213,8 +213,13 @@ class JavaParser(Parser):
         return self.visit(node.expression)
 
     def visit_MethodInvocation(self, node):
+        op = None
         # Parse args
         args = list(map(self.visit_expr, node.arguments))
+
+        if node.qualifier is None:
+            return Op(node.member, *args, line=node.position.line)
+
         if node.qualifier.startswith('System'):
             if node.member == 'println' or node.member == 'print':
                 self.visit_println(node, args)
@@ -223,25 +228,25 @@ class JavaParser(Parser):
                 self.visit_printf(node, args)
 
             elif node.member == 'exit':
-                return Op(node.member, *args, line=node.position.line)
+                op = Op(node.member, *args, line=node.position.line)
 
         elif node.qualifier == 'Math' and node.member in self.MATH_FNCS:
-            return Op(node.member, *args, line=node.position.line)
+            op = Op(node.member, *args, line=node.position.line)
 
         elif node.qualifier in self.STATIC_FNCS.keys() and \
                 node.member in self.STATIC_FNCS.get(node.qualifier):
             if node.qualifier == 'Integer':
                 if node.member == 'toString':
-                    return Op('IntegertoString', *args, line=node.position.line)
+                    op = Op('IntegertoString', *args, line=node.position.line)
                 elif node.member == 'valueOf':
-                    return Op('IntegervalueOf', *args, line=node.position.line)
+                    op = Op('IntegervalueOf', *args, line=node.position.line)
             elif node.qualifier == 'Arrays':
                 if node.member == 'toString':
-                    return Op('ArraystoString', *args, line=node.position.line)
+                    op = Op('ArraystoString', *args, line=node.position.line)
                 elif node.member == 'equals':
-                    return Op('Arraysequals', *args, line=node.position.line)
-
-            return Op(node.member, *args, line=node.position.line)
+                    op = Op('Arraysequals', *args, line=node.position.line)
+            else:
+                op = Op(node.member, *args, line=node.position.line)
 
         elif node.member in self.fnc_names:
             expr = Var(node.member, line=node.position.line)
@@ -253,12 +258,12 @@ class JavaParser(Parser):
                 if self.fnc.name not in self.calling_fncs[node.member]:
                     self.calling_fncs[node.member].append(self.fnc.name)
 
-            return Op('FuncCall', expr, *args, line=node.position.line)
+            op = Op('FuncCall', expr, *args, line=node.position.line)
 
         elif self.fnc.gettype(node.qualifier) == 'String' and \
                 node.member in self.STRING_FNCS:
             expr = Var(node.qualifier, line=node.position.line)
-            return Op(node.member, expr, *args, line=node.position.line)
+            op = Op(node.member, expr, *args, line=node.position.line)
 
         elif self.fnc.gettype(node.qualifier) == 'Scanner' and \
                 node.member in self.SCANNER_FNCS:
@@ -270,19 +275,27 @@ class JavaParser(Parser):
 
                 rexpr = Op('ListHead', Const(t), Var(VAR_IN), line=node.position.line)
 
-                return rexpr
+                op = rexpr
             else:
-                return Op(node.member, *args, line=node.position.line)
+                op = Op(node.member, *args, line=node.position.line)
 
         elif isinstance(self.fnc.gettype(node.qualifier), str) and \
                 self.fnc.gettype(node.qualifier).endswith('[]') and \
                 node.member in self.ARR_FNCS:
             expr = Var(node.qualifier, line=node.position.line)
-            return Op(node.member, expr, *args, line=node.position.line)
+            op = Op(node.member, expr, *args, line=node.position.line)
 
         else:
             raise NotSupported(
                 "Unsupported function call: '%s'" % (node.member,), line=node.position.line)
+
+        if node.selectors:
+            ret_expr = self.visit(node.selectors[0])
+            ret_expr.args = [op] + ret_expr.args
+            return ret_expr
+
+        if op:
+            return op
 
     def visit_println(self, node, args):
         values_model = list(map(self.visit_expr, node.arguments))

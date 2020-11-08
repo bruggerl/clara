@@ -116,7 +116,8 @@ class JavaInterpreter(Interpreter):
             t = x.type
 
         x = self.execute(x, mem)
-        if x and not isinstance(x, list):
+
+        if x and not isinstance(x, list) and not isinstance(x, str):
             x = self.tonumeric(x)
 
         # Special case for short-circut
@@ -131,7 +132,7 @@ class JavaInterpreter(Interpreter):
             return self.tonumeric(self.execute(y, mem))
 
         y = self.execute(y, mem)
-        if y and not isinstance(y, list):
+        if y and not isinstance(y, list) and not isinstance(x, str):
             y = self.tonumeric(y)
 
         x, y = self.togreater(x, y)
@@ -477,9 +478,9 @@ class JavaInterpreter(Interpreter):
             return float(val)
 
         if t == 'char':
-            if val in [True, False]:
-                val = 1 if val else 0
-            return int(val) % 128
+            if not isinstance(val, str) or len(val) > 1:
+                raise RuntimeErr("Expected char, got '%s'" % (val,))
+            return val[0]
 
         if t.endswith('[]'):
             st = t[:-2]
