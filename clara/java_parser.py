@@ -245,7 +245,8 @@ class JavaParser(Parser):
                     op = Op('ArraystoString', *args, line=node.position.line)
                 elif node.member == 'equals':
                     op = Op('Arraysequals', *args, line=node.position.line)
-            else:
+
+            if op is None:
                 op = Op(node.member, *args, line=node.position.line)
 
         elif node.member in self.fnc_names:
