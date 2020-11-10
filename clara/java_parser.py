@@ -78,7 +78,7 @@ class JavaParser(Parser):
 
     def visit_MethodDeclaration(self, node):
         name = node.name
-        rtype = 'void' if node.return_type is None else node.return_type.name
+        rtype = self.visit(node.return_type) if node.return_type else 'void'
 
         params = []
 
