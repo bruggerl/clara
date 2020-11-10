@@ -467,9 +467,14 @@ class JavaInterpreter(Interpreter):
         if isinstance(val, UndefValue):
             return val
 
+        if val is None:
+            return None
+
         if t == 'int':
             if val in [True, False]:
                 val = 1 if val else 0
+            elif isinstance(val, str):
+                return ord(val)
             return int(val)
 
         if t == 'float':
