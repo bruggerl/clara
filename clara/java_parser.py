@@ -157,10 +157,7 @@ class JavaParser(Parser):
                 init.type = type
 
             if isinstance(init, Op):
-                if init.name == 'ArrayCreate' or init.name == 'ArrayInit':
-                    type += '[]'
-
-                elif init.name == 'ListHead':
+                if init.name == 'ListHead':
                     varin = True
 
             try:
