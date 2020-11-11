@@ -132,10 +132,18 @@ class JavaInterpreter(Interpreter):
             return self.tonumeric(self.execute(y, mem))
 
         y = self.execute(y, mem)
-        if y and not isinstance(y, list) and not isinstance(x, str):
+        if y and not isinstance(y, list) and not isinstance(y, str):
             y = self.tonumeric(y)
 
         x, y = self.togreater(x, y)
+
+        if isinstance(x, str) and (isinstance(y, int) or isinstance(y, float)):
+            if len(x) == 1:
+                x = ord(x)
+
+        if isinstance(y, str) and (isinstance(x, int) or isinstance(x, float)):
+            if len(y) == 1:
+                y = ord(y)
 
         if op == '+':
             res = x + y
@@ -483,6 +491,8 @@ class JavaInterpreter(Interpreter):
             return float(val)
 
         if t == 'char':
+            if isinstance(val, int):
+                return chr(val)
             if not isinstance(val, str) or len(val) > 1:
                 raise RuntimeErr("Expected char, got '%s'" % (val,))
             return val[0]
