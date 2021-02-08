@@ -22,7 +22,7 @@ class JavaParser(Parser):
 
     STRING_FNCS = {'length', 'substring', 'concat', 'charAt', 'equals', 'isEmpty',
                    'startsWith', 'endsWith', 'replace', 'replaceAll', 'replaceFirst',
-                   'indexOf', 'contains'}
+                   'indexOf', 'contains', 'matches'}
 
     ARR_FNCS = {'clone'}
 

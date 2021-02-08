@@ -7,6 +7,7 @@ from .interpreter import Interpreter, addlanginter, RuntimeErr, UndefValue
 from .model import Var, VAR_IN
 
 import math
+import re
 
 
 def libcall(*args):
@@ -260,6 +261,13 @@ class JavaInterpreter(Interpreter):
             return v[i:j]
 
         return v[i:]
+
+    def execute_matches(self, op, mem):
+        s = self.execute(op.args[0], mem)
+        r = self.execute(op.args[1], mem)
+        regex = re.compile(r)
+
+        return regex.match(s) is not None
 
     def execute_concat(self, op, mem):
         a = self.execute(op.args[0], mem)
