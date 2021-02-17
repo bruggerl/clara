@@ -236,7 +236,7 @@ class Matching(object):
         return sm
         
     def match_programs(self, P, Q, inter, ins=None, args=None,
-                       entryfnc=None, timeout=None, filter_regex=re.compile('.*')):
+                       entryfnc=None, timeout=None, filter_regex='.*'):
 
         # Check inputs and arguments
         assert ins or args, "Inputs or argument required"

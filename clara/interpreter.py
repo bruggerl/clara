@@ -34,7 +34,7 @@ def isundef(x):
 class Interpreter(object):
     DEFAULT_RETURN = UndefValue()
 
-    def __init__(self, timeout=None, entryfnc='main',  filter_regex=re.compile('.*')):
+    def __init__(self, timeout=None, entryfnc='main',  filter_regex='.*'):
         self.timeout = timeout
         self.starttime = None
         self.entryfnc = entryfnc
@@ -233,14 +233,12 @@ class Interpreter(object):
         for x in args:
             s = str(self.execute(x, mem))
 
-            r = self.filter_regex.match(s)
+            lst = re.findall(self.filter_regex, s)
 
-            if not r:
+            if not lst:
                 continue
 
-            s = r.group()
-
-            values.append(s)
+            values += lst
 
         return values
 

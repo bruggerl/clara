@@ -133,7 +133,7 @@ Options are:
         self.suboptimal = int(self.opts.pop('suboptimal', 1))
         self.maxfeedcost = int(self.opts.pop('maxfeedcost', 0))
         self.clusterdir = self.opts.pop('clusterdir', 'clusters')
-        self.filter_regex = re.compile(self.opts.pop('filter', 'a^'))
+        self.filter_regex = self.opts.pop('filter', '.*')
 
         self.poolsize = self.opts.pop('poolsize', None)
         if self.poolsize is not None:
