@@ -9,6 +9,7 @@ import glob
 import json
 import os
 import pprint
+import re
 import shutil
 import sys
 import traceback
@@ -71,6 +72,7 @@ Options are:
                      than N, an error occurs
                      (default is 0, which means that there is no limit)
   --clusterdir DIR   directory to write/read clustering results
+  --filter R         for Java program; filter print output with given regex (only output that matches regex will be considered)
 '''
 
     def __init__(self):
@@ -131,6 +133,7 @@ Options are:
         self.suboptimal = int(self.opts.pop('suboptimal', 1))
         self.maxfeedcost = int(self.opts.pop('maxfeedcost', 0))
         self.clusterdir = self.opts.pop('clusterdir', 'clusters')
+        self.filter_regex = re.compile(self.opts.pop('filter', 'a^'))
 
         self.poolsize = self.opts.pop('poolsize', None)
         if self.poolsize is not None:
@@ -217,7 +220,7 @@ Options are:
 
         m = M.match_programs(self.models[0], self.models[1], self.inter,
                              ins=self.ins, args=self.args,
-                             entryfnc=self.entryfnc)
+                             entryfnc=self.entryfnc, filter_regex=self.filter_regex)
         if m:
             self.debug('Match: %s', pprint.pformat(m[1]))
             print('Match!')

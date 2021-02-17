@@ -3,6 +3,8 @@ Simulation relation
 '''
 
 # clara imports
+import re
+
 from .common import debug, equals
 from .interpreter import Interpreter, RuntimeErr, UndefValue, isundef
 from .model import SPECIAL_VARS, VAR_RET, VAR_IN, VAR_OUT, isprimed, prime
@@ -234,7 +236,7 @@ class Matching(object):
         return sm
         
     def match_programs(self, P, Q, inter, ins=None, args=None,
-                       entryfnc=None, timeout=None):
+                       entryfnc=None, timeout=None, filter_regex=re.compile('.*')):
 
         # Check inputs and arguments
         assert ins or args, "Inputs or argument required"
@@ -248,7 +250,7 @@ class Matching(object):
                 "Equal number of inputs and arguments expected"
 
         # Create interpreter
-        I = inter(timeout=timeout, entryfnc=entryfnc)
+        I = inter(timeout=timeout, entryfnc=entryfnc, filter_regex=filter_regex)
 
         # Check struct
         if isinstance(I, JavaInterpreter):

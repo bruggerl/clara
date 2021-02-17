@@ -3,13 +3,14 @@ Common interpreter stuff
 '''
 
 # Python imports
+import re
 import time
 
 from copy import deepcopy
 
 # clara imports
 from .common import UnknownLanguage
-from .model import Program, VAR_IN, VAR_OUT, VAR_RET, VAR_COND
+from .model import Program, VAR_IN, VAR_OUT, VAR_RET, VAR_COND, Var
 from .model import prime, unprime, isprimed
 
 
@@ -25,19 +26,19 @@ class UndefValue(object):
     def __repr__(self):
         return '<undef>'
 
-    
+
 def isundef(x):
     return isinstance(x, UndefValue)
 
 
 class Interpreter(object):
-
     DEFAULT_RETURN = UndefValue()
 
-    def __init__(self, timeout=None, entryfnc='main'):
+    def __init__(self, timeout=None, entryfnc='main',  filter_regex=re.compile('.*')):
         self.timeout = timeout
         self.starttime = None
         self.entryfnc = entryfnc
+        self.filter_regex = filter_regex
 
         self.fnc = None
         self.loc = None
@@ -51,7 +52,6 @@ class Interpreter(object):
         return self.prog.getfnc(name)
 
     def run(self, prog, mem=None, ins=None, args=None, entryfnc=None):
-
         if not isinstance(prog, Program):
             raise Exception("Expected Program, for '%s'" % (prog,))
 
@@ -70,7 +70,7 @@ class Interpreter(object):
 
         # Init trace
         self.trace = []
-        
+
         # Set inputs
         if ins:
             mem[VAR_IN] = list(ins)
@@ -104,10 +104,10 @@ class Interpreter(object):
 
         # Check for timeout
         if self.timeout and self.starttime \
-           and (time.time() - self.starttime > self.timeout):
+                and (time.time() - self.starttime > self.timeout):
             raise RuntimeErr(
                 'Timeout (%.3f)' % (round(time.time() - self.starttime, 3),))
-        
+
         # Get name of the object to be executed
         name = obj.__class__.__name__
         meth = getattr(self, 'execute_%s' % (name,))
@@ -118,9 +118,8 @@ class Interpreter(object):
                 TypeError, IndexError, RuntimeError, ValueError, KeyError) as ex:
             raise RuntimeErr("Exception '%s' on execution of '%s'" % (
                 ex, obj))
-                
-    def execute_Function(self, fnc, mem):
 
+    def execute_Function(self, fnc, mem):
         self.fnc = fnc.name
         self.loc = fnc.initloc
 
@@ -128,12 +127,12 @@ class Interpreter(object):
 
             # Execute all exprs
             for (var, expr) in fnc.exprs(self.loc):
-                
+
                 val = self.execute(expr, mem)
-                
+
                 if var == VAR_COND:
                     val = not not val
-                    
+
                 varp = prime(var)
                 vtype = (fnc.rettype if var == VAR_RET
                          else (fnc.gettype(var) or '*'))
@@ -155,7 +154,7 @@ class Interpreter(object):
             numtrans = fnc.numtrans(self.loc)
             if numtrans == 0:  # Done
                 break
-            
+
             elif numtrans == 1:  # Trivially choose True
                 self.loc = fnc.trans(self.loc, True)
 
@@ -195,7 +194,7 @@ class Interpreter(object):
 
         if op.name == '[]':
             return self.execute_ArrayIndex(op, mem)
-                
+
         meth = getattr(self, 'execute_%s' % (op.name,))
         return meth(op, mem)
 
@@ -222,21 +221,39 @@ class Interpreter(object):
         raise RuntimeErr("ListTail on '%s'" % (l,))
 
     def execute_StrAppend(self, a, mem):
+        if len(a.args) > 1 and isinstance(a.args[0], Var) and a.args[0].name == VAR_OUT:
+            values = self.filter_with_regex(a.args[1:], mem)
+            return ''.join(values)
 
         return ''.join([str(self.execute(x, mem)) for x in a.args])
 
-    def execute_StrFormat(self, f, mem):
+    def filter_with_regex(self, args, mem):
+        values = []
 
+        for x in args:
+            s = str(self.execute(x, mem))
+
+            r = self.filter_regex.match(s)
+
+            if not r:
+                continue
+
+            s = r.group()
+
+            values.append(s)
+
+        return values
+
+    def execute_StrFormat(self, f, mem):
         fmt = self.execute(f.args[0], mem)
         if not isinstance(fmt, str):
             raise RuntimeErr("Expected 'str' for format, got '%s'" % (fmt,))
-        
+
         args = [self.execute(x, mem) for x in f.args[1:]]
 
         return fmt % tuple(args)
 
     def execute_ite(self, ite, mem):
-
         cond = not not self.execute(ite.args[0], mem)
 
         if cond:
@@ -270,10 +287,10 @@ class Interpreter(object):
         trace = self.execute(fnc, newmem)
         self.fnc = oldfnc
         self.loc = oldloc
-        
+
         return trace[-1][2].get(prime(VAR_RET), self.DEFAULT_RETURN)
 
-        
+
 INTERPRETERS = {}
 
 

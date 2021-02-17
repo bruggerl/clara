@@ -63,7 +63,7 @@ class Clustering(object):
             found = False
             for i, cprog in enumerate(clusters):
                 m = self.matching.match_programs(
-                    cprog, prog, inter, ins=ins, args=args, entryfnc=entryfnc, timeout=10)
+                    cprog, prog, inter, ins=ins, args=args, entryfnc=entryfnc, timeout=30)
                 if not m: continue
 
                 if inter.__name__ == 'JavaInterpreter':
