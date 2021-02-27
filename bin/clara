@@ -5,11 +5,11 @@ clara CLI interface
 '''
 
 # Python imports
+import csv
 import glob
 import json
 import os
 import pprint
-import re
 import shutil
 import sys
 import traceback
@@ -28,17 +28,19 @@ from clara.clustering import Clustering
 from clara.model import expr_to_dict, dict_to_expr
 from clara.parser import getlangparser
 from clara.repair import Repair
+from clara.filtering import Filtering
 
-VERBOSE=0
+VERBOSE = 0
+
 
 class Clara(object):
-
     USAGE = '''
 %s COMMAND [OPTIONS*] SOURCE_FILE_1 SOURCE_FILE_2 ...
 
 Commands are:
   help       print this usage message
   model      prints a model of a program
+  filter     filter out incorrect programs from a set of files with CSV file specifying input and expected output/return value
   match      run the matching procedure on two source files
   cluster    run the clustering on a set of files
   repair     run the repair algorithm on two source files
@@ -72,7 +74,9 @@ Options are:
                      than N, an error occurs
                      (default is 0, which means that there is no limit)
   --clusterdir DIR   directory to write/read clustering results
-  --filter R         for Java program; filter print output with given regex (only output that matches regex will be considered)
+  --filter-output R  filter print output with given regex (only output that matches regex will be considered)
+  --csv P            path to CSV file with test cases (each line consisting of args;ins;output;ret)
+  --correctdir P     directory for filtered out correct programs
 '''
 
     def __init__(self):
@@ -89,7 +93,7 @@ Options are:
         '''
         Prints debug message if verbose mode on.
         '''
-        
+
         if self.verbose:
             debug(msg, *args)
 
@@ -97,7 +101,7 @@ Options are:
         '''
         Prints error message and exits
         '''
-        
+
         if args:
             msg %= args
         print('Error: %s\n' % (msg,), file=sys.stderr)
@@ -122,7 +126,7 @@ Options are:
 
         self.verbose = int(self.opts.pop('verbose', 0))
         VERBOSE = self.verbose
-        
+
         self.lang = self.opts.pop('lang', None)
         self.timeout = int(self.opts.pop('timeout', 60))
         self.ignoreio = int(self.opts.pop('ignoreio', 0))
@@ -133,7 +137,9 @@ Options are:
         self.suboptimal = int(self.opts.pop('suboptimal', 1))
         self.maxfeedcost = int(self.opts.pop('maxfeedcost', 0))
         self.clusterdir = self.opts.pop('clusterdir', 'clusters')
-        self.filter_regex = self.opts.pop('filter', '.*')
+        self.filter_regex = self.opts.pop('filter-output', '.*')
+        self.csv = self.opts.pop('csv', None)
+        self.correctdir = self.opts.pop('correctdir', None)
 
         self.poolsize = self.opts.pop('poolsize', None)
         if self.poolsize is not None:
@@ -158,7 +164,7 @@ Options are:
             self.error('Got both inputs and file with inputs: which to use?')
         if self.args is not None and self.argsfile is not None:
             self.error('Got both args and file with args: which to use?')
-        
+
         if self.ins is not None:
             self.ins = literal_eval(self.ins)
         if self.args is not None:
@@ -180,6 +186,9 @@ Options are:
 
         if self.cmd == 'match':
             self.match()
+
+        elif self.cmd == 'filter':
+            self.filter()
 
         elif self.cmd == 'cluster':
             self.cluster()
@@ -227,6 +236,34 @@ Options are:
         else:
             print('No match!')
 
+    def filter(self):
+        if not self.csv:
+            self.error('No CSV file containing test cases specified')
+
+        tests = []
+
+        with open(self.csv, newline='') as csvfile:
+            csvreader = csv.reader(csvfile, delimiter=';', escapechar='\\')
+
+            for row in csvreader:
+                d = {'args': literal_eval(row[0]),
+                     'ins': literal_eval(row[1]),
+                     'out': literal_eval(row[2]),
+                     'ret': literal_eval(row[3])}
+                tests.append(d)
+
+        F = Filtering()
+
+        correct = F.filter(self.models, self.inter, tests, entryfnc=self.entryfnc, filter_regex=self.filter_regex)
+
+        print("CORRECT SOLUTIONS:")
+        for c in correct:
+            print(c.name)
+
+            if self.correctdir:
+                filename = c.name.split('/')[-1]
+                shutil.copyfile(c.name, os.path.join(self.correctdir, filename))
+
     def cluster(self):
         if len(self.models) < 1:
             self.error('Clustering requires at least one program!')
@@ -243,13 +280,13 @@ Options are:
             model = self.process_source(f)
             existing.append(model)
         print("Found %d existing clusters" % (len(existing)))
-                    
+
         new, mod = C.cluster(self.models, self.inter,
                              ins=self.ins, args=self.args,
                              entryfnc=self.entryfnc, existing=existing)
 
         print("Done, %d new clusters, %d modified clusters" % (len(new), len(mod)))
-        
+
         # Add new clusters
         for f in new:
             f.new_name = os.path.join(self.clusterdir, f.new_name)
@@ -329,7 +366,7 @@ Options are:
                            feed.cost, self.maxfeedcost)
             for f in feed.feedback:
                 print('*', f)
-                
+
         elif feed.status == Feedback.STATUS_ERROR:
             self.error(feed.error)
 
@@ -357,7 +394,7 @@ Options are:
         '''
         Dumps additional expressions.
         '''
-        
+
         exprs = []
         for fnc in model.getfncs():
             if not hasattr(fnc, 'repair_exprs'):
@@ -381,7 +418,7 @@ Options are:
                             "expr": expr_to_dict(expr),
                             "src": expr.src,
                         })
-                        
+
         ext = '.' + self.lang
         exprs_filename = model.name.replace(ext, '-exprs.json')
         with open(exprs_filename, 'w') as f:
@@ -425,16 +462,16 @@ Options are:
         '''
 
         self.debug("Reading and parsing source file '%s'", src)
-            
+
         with open(src, 'r', encoding="utf-8") as f:
             code = f.read()
-            
+
         model = self.parser.parse_code(code)
         model.name = src
         self.extract_exprs(model)
 
         return model
-            
+
     def process_sources(self):
         '''
         Reads and parses source files (sets models field).
@@ -445,7 +482,7 @@ Options are:
         for src in self.sources:
             model = self.process_source(src)
             self.models.append(model)
-                
+
 
 if __name__ == '__main__':
     try:

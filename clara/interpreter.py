@@ -10,7 +10,7 @@ from copy import deepcopy
 
 # clara imports
 from .common import UnknownLanguage
-from .model import Program, VAR_IN, VAR_OUT, VAR_RET, VAR_COND, Var
+from .model import Program, VAR_IN, VAR_OUT, VAR_RET, VAR_COND, Var, Op
 from .model import prime, unprime, isprimed
 
 
@@ -34,7 +34,7 @@ def isundef(x):
 class Interpreter(object):
     DEFAULT_RETURN = UndefValue()
 
-    def __init__(self, timeout=None, entryfnc='main',  filter_regex='.*'):
+    def __init__(self, timeout=None, entryfnc='main',  filter_regex='.*', track=True):
         self.timeout = timeout
         self.starttime = None
         self.entryfnc = entryfnc
@@ -47,6 +47,12 @@ class Interpreter(object):
 
         self.prog = None
 
+        self.track = track
+
+        if self.track:
+            self.output = ''
+            self.retval = None
+
     def getfnc(self, name):
 
         return self.prog.getfnc(name)
@@ -56,6 +62,10 @@ class Interpreter(object):
             raise Exception("Expected Program, for '%s'" % (prog,))
 
         self.prog = prog
+
+        if self.track:
+            self.output = ''
+            self.retval = None
 
         # Get function
         entryfnc = entryfnc or self.entryfnc
@@ -97,7 +107,12 @@ class Interpreter(object):
         self.starttime = time.time()
 
         res = self.execute(fnc, mem)
+
+        if self.track:
+            self.retval = res[-1][2].get('$ret\'')
+
         self.prog = None
+
         return res
 
     def execute(self, obj, mem):
@@ -127,7 +142,6 @@ class Interpreter(object):
 
             # Execute all exprs
             for (var, expr) in fnc.exprs(self.loc):
-
                 val = self.execute(expr, mem)
 
                 if var == VAR_COND:
@@ -221,17 +235,37 @@ class Interpreter(object):
         raise RuntimeErr("ListTail on '%s'" % (l,))
 
     def execute_StrAppend(self, a, mem):
-        if len(a.args) > 1 and isinstance(a.args[0], Var) and a.args[0].name == VAR_OUT:
-            values = self.filter_with_regex(a.args[1:], mem)
-            return ''.join(values)
+        is_output = self.is_output(a)
 
-        return ''.join([str(self.execute(x, mem)) for x in a.args])
+        if len(a.args) > 1 and is_output:
+            values = self.filter_with_regex(a.args[1:], mem)
+            val = ''.join(values)
+
+            if self.track:
+                self.output += val
+
+            return val
+
+        return ''.join([self.unescape_chars(str(self.execute(x, mem))) for x in a.args])
+
+    def is_output(self, a):
+        in_var_args = [x for x in a.args if isinstance(x, Var) and x.name == VAR_OUT]
+
+        if in_var_args:
+            return True
+
+        in_op_args = [x for x in a.args if isinstance(x, Op) and self.is_output(x)]
+
+        if in_op_args:
+            return True
+
+        return False
 
     def filter_with_regex(self, args, mem):
         values = []
 
         for x in args:
-            s = str(self.execute(x, mem))
+            s = self.unescape_chars(str(self.execute(x, mem)))
 
             lst = re.findall(self.filter_regex, s)
 
@@ -241,6 +275,43 @@ class Interpreter(object):
             values += lst
 
         return values
+
+    def unescape_chars(self, s):
+        res = ''
+
+        i = 0
+        while i < len(s):
+            if s[i] == '\\' and i + 1 < len(s):
+                if s[i+1] == 't':
+                    res += '\t'
+                    i += 2
+                elif s[i+1] == 'b':
+                    res += '\b'
+                    i += 2
+                elif s[i+1] == 'n':
+                    res += '\n'
+                    i += 2
+                elif s[i+1] == 'r':
+                    res += '\r'
+                    i += 2
+                elif s[i+1] == '\'':
+                    res += '\''
+                    i += 2
+                elif s[i+1] == '\"':
+                    res += '\"'
+                    i += 2
+                elif s[i+1] == '\\':
+                    res += '\\'
+                    i += 2
+                else:
+                    res += '\\'
+                    i += 1
+
+            else:
+                res += s[i]
+                i += 1
+
+        return res
 
     def execute_StrFormat(self, f, mem):
         fmt = self.execute(f.args[0], mem)

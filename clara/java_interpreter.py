@@ -64,18 +64,7 @@ class JavaInterpreter(Interpreter):
 
         # Char
         if len(c.value) >= 3 and c.value[0] == c.value[-1] == "'":
-            try:
-                ch = c.value[1:-1]
-                if len(ch) <= 2:
-                    if ch == '\\\\':
-                        return ord('\\')
-                    elif ch == '\\n':
-                        return ord('\n')
-                    elif ch == '\\t':
-                        return ord('\t')
-                    return ord(ch)
-            except ValueError:
-                pass
+            return str(c.value[1:-1])
 
         # Bool
         if c.value in ('true', 'false'):
@@ -501,8 +490,12 @@ class JavaInterpreter(Interpreter):
         if t == 'char':
             if isinstance(val, int):
                 return chr(val)
-            if not isinstance(val, str) or len(val) > 1:
+            if not isinstance(val, str) or len(val) > 2:
                 raise RuntimeErr("Expected char, got '%s'" % (val,))
+
+            if val == '\\\\':
+                val = '\\'
+
             return val[0]
 
         if t.endswith('[]'):
