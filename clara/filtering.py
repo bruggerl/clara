@@ -15,9 +15,6 @@ class Filtering(object):
                 try:
                     I.run(prog, ins=test['ins'], args=test['args'], entryfnc=entryfnc)
                 except RuntimeErr as e:
-                    print("EXCEPTION")
-                    print(test)
-                    print(e)
                     correct = False
                     break
 

@@ -336,6 +336,8 @@ class JavaParser(Parser):
                 raise NotSupported('++/-- only supported for Vars')
             elif node.prefix_operators[0] == '-':
                 return Op('-', expr, line=node.position.line)
+            elif node.prefix_operators[0] == '!':
+                return Op('!', expr, line=node.position.line)
 
         if node.postfix_operators:
             if node.prefix_operators[0] in ['--', '++']:
